@@ -1,0 +1,130 @@
+:root{
+  /* Tipografia */
+  --font-system: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  --font-weight-regular: 400;
+  --line-height-base: 1.5;
+
+  /* Paleta — verdes amenos (um pouco mais escuro, ainda claro) */
+  --eco-green-100: #eef9ef; /* fundo muito claro */
+  --eco-green-200: #dff3de;
+  --eco-green-300: #c3eec1;
+  --eco-green-400: #8fe6a3;
+  --eco-green-500: #59c88c; /* primária */
+  --eco-green-600: #3fa96f; /* primária escura (hover) */
+  --eco-muted: #4a6a54;     /* texto secundário */
+  --eco-dark: #22382b;      /* texto principal */
+
+  /* Espaçamento / raios */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+
+  /* Transições */
+  --trans-fast: 140ms;
+  --trans-medium: 220ms;
+
+  /* Layout */
+  --container-max: 1200px;
+}
+
+/* Reset / base */
+*{box-sizing:border-box}
+html,body,#root{height:100%}
+body{
+  margin:0;
+  font-family:var(--font-system);
+  font-weight:var(--font-weight-regular);
+  line-height:var(--line-height-base);
+  color:var(--eco-dark);
+  background: linear-gradient(180deg, var(--eco-green-100) 0%, #ffffff 100%);
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+  min-width:320px;
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+}
+
+/* Containers utilitários */
+.container-main{
+  width:100%;
+  max-width:var(--container-max);
+  margin:0 auto;
+  padding:1rem;
+  flex:1 0 auto;
+}
+
+/* Tipografia */
+h1{font-size:2.4rem;line-height:1.05;margin:0 0 .6rem}
+p{margin:0 0 1rem;color:var(--eco-muted)}
+
+/* Links */
+a{color:var(--eco-green-500);text-decoration:none;font-weight:500}
+a:hover{color:var(--eco-green-600);text-decoration:underline}
+
+/* Botões globais */
+button{
+  border-radius:var(--radius-md);
+  border:1px solid transparent;
+  padding:0.5rem 0.9rem;
+  font-size:1rem;
+  font-weight:600;
+  font-family:inherit;
+  cursor:pointer;
+  transition:transform var(--trans-fast), box-shadow var(--trans-fast), background var(--trans-fast);
+}
+
+/* Botão sólido eco */
+.btn-eco{
+  background: linear-gradient(180deg, var(--eco-green-500), var(--eco-green-600));
+  color:#fff;
+  border:none;
+  box-shadow: 0 6px 18px rgba(63,169,111,0.12);
+}
+.btn-eco:hover,
+.btn-eco:focus{
+  transform:translateY(-2px);
+  box-shadow: 0 10px 26px rgba(63,169,111,0.14);
+  filter:brightness(1.02);
+}
+
+/* Botão outline */
+.btn-eco-outline{
+  background:transparent;
+  color:var(--eco-dark);
+  border:1px solid rgba(63,169,111,0.14);
+}
+.btn-eco-outline:hover,
+.btn-eco-outline:focus{
+  background: rgba(95,184,120,0.08);
+  transform:translateY(-2px);
+}
+
+/* Pequenos utilitários visuais */
+.card{
+  background:#fff;
+  border-radius:var(--radius-md);
+  box-shadow: 0 8px 24px rgba(34,50,35,0.04);
+  padding:1rem;
+}
+
+/* Ajustes responsivos */
+@media (max-width: 980px){
+  .container-main{padding:0.8rem}
+  h1{font-size:1.9rem}
+}
+
+/* Suporte dark mode (preserva acentos verdes) */
+@media (prefers-color-scheme: dark){
+  :root{
+    --eco-green-100: #082312;
+    --eco-green-200: #08321e;
+  }
+  body{
+    background: linear-gradient(180deg, #071512 0%, #081716 100%);
+    color:#dcefe2;
+  }
+  a{color:var(--eco-green-400)}
+  .card{background:linear-gradient(180deg, rgba(6,23,17,0.6), rgba(8,20,16,0.6)); box-shadow:none}
+  .btn-eco{box-shadow: 0 6px 18px rgba(59,136,108,0.16)}
+}

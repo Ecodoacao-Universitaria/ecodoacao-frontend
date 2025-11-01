@@ -1,0 +1,92 @@
+/* Paleta: verdes amenos, fundo claro, cantos arredondados, transições sutis */
+
+.eco-navbar {
+  background: linear-gradient(180deg, #f6fbf7 0%, #ffffff 100%);
+  border-radius: 12px;
+  padding: 0.45rem 1rem;
+  box-shadow: 0 6px 18px rgba(34, 50, 35, 0.06);
+  align-items: center;
+  margin: 0.6rem 0;
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(34, 50, 35, 0.04);
+}
+
+.eco-brand {
+  color: #2b7a53;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  font-size: 1.05rem;
+  padding-right: 0.5rem;
+}
+
+.eco-nav-link {
+  color: #355e45;
+  margin-right: 0.25rem;
+  border-radius: 8px;
+  padding: 0.35rem 0.6rem;
+  transition: background-color 180ms ease, color 180ms ease, transform 120ms ease;
+  font-weight: 500;
+}
+
+.eco-nav-link:hover,
+.eco-nav-link:focus {
+  background: rgba(154, 229, 183, 0.14); /* verde claro sutil */
+  color: #1f5a3f;
+  transform: translateY(-1px);
+  text-decoration: none;
+}
+
+.eco-nav-dropdown .dropdown-menu {
+  border-radius: 10px;
+  border: 1px solid rgba(34,50,35,0.06);
+  box-shadow: 0 8px 20px rgba(34,50,35,0.06);
+}
+
+/* Botões */
+.eco-btn {
+  border-radius: 999px; /* pill */
+  padding: 0.35rem 0.85rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+  transition: transform 120ms ease, box-shadow 140ms ease, opacity 120ms ease;
+  box-shadow: none;
+}
+
+/* Botão sólido verde */
+.eco-btn-solid {
+  background: linear-gradient(180deg, #59c88c, #3fb776);
+  border: none;
+  color: #0b3b27;
+}
+.eco-btn-solid:hover,
+.eco-btn-solid:focus {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px rgba(66, 153, 102, 0.14);
+  opacity: 0.98;
+}
+
+/* Botão outline */
+.eco-btn-outline {
+  background: transparent;
+  border: 1px solid rgba(63,183,118,0.12);
+  color: #2f6f4f;
+}
+.eco-btn-outline:hover,
+.eco-btn-outline:focus {
+  background: rgba(95, 184, 120, 0.08);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(63,183,118,0.08);
+}
+
+/* Ajustes responsivos e pequenos detalhes */
+@media (max-width: 768px) {
+  .eco-navbar {
+    padding: 0.4rem 0.6rem;
+  }
+  .eco-brand {
+    font-size: 1rem;
+  }
+  .eco-nav-link {
+    padding: 0.5rem 0.6rem;
+  }
+}

@@ -1,0 +1,75 @@
+/* Variáveis locais (podem ser movidas para :root no index.css) */
+.eco-header {
+  display: flex;
+  justify-content: center;
+  padding: 0.8rem 1rem;
+  background: linear-gradient(180deg, rgba(245,252,249,0.9), rgba(255,255,255,0.9));
+  box-shadow: 0 8px 26px rgba(39,77,58,0.04);
+  border-bottom-left-radius: var(--radius-lg);
+  border-bottom-right-radius: var(--radius-lg);
+  backdrop-filter: blur(6px);
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  border: 1px solid rgba(39,77,58,0.04);
+}
+
+/* inner para limitar largura e alinhamento */
+.eco-header-inner {
+  width: 100%;
+  max-width: var(--container-max);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 8px;
+  box-sizing: border-box;
+}
+
+/* garante que a navbar (react-bootstrap) mantenha o visual leve */
+.eco-navbar {
+  width: 100%;
+  background: transparent !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+/* brand tweaks */
+.eco-brand {
+  color: var(--eco-green-600);
+  font-weight: 700;
+  font-size: 1.02rem;
+  letter-spacing: 0.2px;
+}
+
+/* pequenas melhorias visuais para os links quando dentro do header */
+.eco-nav-link {
+  color: var(--eco-text);
+  opacity: 0.9;
+  transition: background-color 160ms ease, transform 120ms ease, color 160ms ease;
+  border-radius: 10px;
+  padding: 0.36rem 0.6rem;
+}
+.eco-nav-link:hover,
+.eco-nav-link:focus {
+  background: var(--eco-glow);
+  color: var(--eco-green-600);
+  transform: translateY(-2px);
+  text-decoration: none;
+}
+
+/* dropdown */
+.eco-nav-dropdown .dropdown-menu {
+  border-radius: 10px;
+  border: 1px solid rgba(39,77,58,0.06);
+  box-shadow: 0 8px 20px rgba(39,77,58,0.06);
+}
+
+/* responsividade: reduz espaçamentos em telas pequenas */
+@media (max-width: 768px) {
+  .eco-header {
+    padding: 0.45rem 0.6rem;
+  }
+  .eco-brand { font-size: 0.98rem; }
+  .eco-nav-link { padding: 0.45rem 0.5rem; font-size: 0.95rem; }
+}

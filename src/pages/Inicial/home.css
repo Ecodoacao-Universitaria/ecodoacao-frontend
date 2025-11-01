@@ -1,0 +1,23 @@
+.home {
+  text-align: center;
+  margin-top: 100px;
+  font-family: Arial, sans-serif;
+}
+
+.home h1 {
+  color: #2563eb;
+}
+
+.home button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  background-color: #2563eb;
+  color: white;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.home button:hover {
+  background-color: #1e40af;
+}
