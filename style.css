@@ -2,20 +2,25 @@ body {
   margin: 0;
   font-family: 'Poppins', sans-serif;
   background: linear-gradient(135deg, #e8f5e9, #a5d6a7);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100vh;
+  min-height: 100vh;
   color: #2e7d32;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* when navbar is fixed-top, add top padding so content isn't hidden */
+@media (min-width: 0px) {
+  body { padding-top: 70px; }
 }
 
 .login-container {
   background: white;
   border-radius: 20px;
   box-shadow: 0 6px 20px rgba(0,0,0,0.15);
-  width: 380px;
+  width: 100%;
+  max-width: 520px;
   text-align: center;
-  padding: 30px 40px;
+  padding: 24px;
+  margin: 24px auto;
 }
 
 .logo-area {
