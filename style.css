@@ -163,6 +163,23 @@ label {
   word-break: break-all !important;
   overflow-wrap: anywhere !important;
 }
+
+/* Navbar hover styles */
+#ecodoacao-navbar .nav-link {
+  transition: background-color 0.15s ease, color 0.15s ease;
+  border-radius: 0.35rem;
+  padding: 0.35rem 0.55rem;
+}
+#ecodoacao-navbar .nav-link:hover {
+  background-color: rgba(72, 180, 97, 0.12);
+  color: #145c32 !important;
+  text-decoration: none;
+}
+#ecodoacao-navbar .nav-link.active {
+  background-color: rgba(72, 180, 97, 0.18);
+  color: #0f5132 !important;
+  font-weight: 600;
+}
 /* === Responsividade Eco Doação === */
 @media (max-width: 768px) {
   body {
