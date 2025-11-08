@@ -246,6 +246,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  // populate donation types into submissao select
+  populateDonationTypes();
+
   // Preenche histórico se estivermos na página
   populateHistorico();
 
@@ -335,6 +338,9 @@ function renderAdminPanel(container: HTMLElement, submissions: Submission[]) {
   card.appendChild(body);
   container.appendChild(card);
 
+  // append types management UI to the admin panel
+  renderTypesManagement(container);
+
   // Wire up controls
   const selectAll = container.querySelector('#selectAllAdmin') as HTMLInputElement | null;
   selectAll?.addEventListener('change', (e) => {
@@ -378,5 +384,161 @@ function updateSubmissionStatus(id: number, newStatus: string) {
   // refresh panels
   populateAdminPanel();
   populateHistorico();
+}
+
+// === Donation Types Management (localStorage) ===
+function getDonationTypes(): Array<{ id: number; name: string }> {
+  const raw = localStorage.getItem('ecodoacao_types');
+  if (!raw) return ensureDefaultDonationTypes();
+  try {
+    const parsed = JSON.parse(raw) as Array<{ id: number; name: string }>;
+    if (!Array.isArray(parsed) || parsed.length === 0) return ensureDefaultDonationTypes();
+    return parsed;
+  } catch {
+    return ensureDefaultDonationTypes();
+  }
+}
+
+function saveDonationTypes(types: Array<{ id: number; name: string }>) {
+  localStorage.setItem('ecodoacao_types', JSON.stringify(types));
+}
+
+function ensureDefaultDonationTypes() {
+  const defaults = [
+    { id: 1, name: 'Reuso de Livros' },
+    { id: 2, name: 'Descarte Eletrônico' },
+    { id: 3, name: 'Doação de Roupas' },
+    { id: 4, name: 'Doação de Alimentos' },
+  ];
+  saveDonationTypes(defaults);
+  return defaults;
+}
+
+function populateDonationTypes() {
+  const selects = document.querySelectorAll<HTMLSelectElement>('select#tipo');
+  if (!selects || selects.length === 0) return;
+  const types = getDonationTypes();
+  selects.forEach(sel => {
+    // preserve a placeholder option if present
+    const placeholder = Array.from(sel.options).find(o => o.value === '');
+    sel.innerHTML = '';
+    if (placeholder) sel.appendChild(placeholder);
+    types.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t.name;
+      opt.textContent = t.name;
+      sel.appendChild(opt);
+    });
+  });
+}
+
+function renderTypesManagement(container: HTMLElement) {
+  const card = document.createElement('div');
+  card.className = 'card mt-3';
+  const body = document.createElement('div');
+  body.className = 'card-body p-3';
+  body.innerHTML = `
+    <h5>Gerenciar Tipos de Doação</h5>
+    <div class="d-flex gap-2 mb-2">
+      <input id="novoTipoInput" class="form-control form-control-sm" placeholder="Novo tipo (ex: Materiais escolares)" />
+      <button id="addTipoBtn" class="btn btn-sm btn-primary">Adicionar</button>
+    </div>
+    <ul id="tiposList" class="list-group list-group-flush"></ul>
+  `;
+  card.appendChild(body);
+  container.appendChild(card);
+
+  const tiposList = body.querySelector('#tiposList') as HTMLUListElement;
+  const novoInput = body.querySelector('#novoTipoInput') as HTMLInputElement;
+  const addBtn = body.querySelector('#addTipoBtn') as HTMLButtonElement;
+
+  function refreshList() {
+    tiposList.innerHTML = '';
+    const types = getDonationTypes();
+    if (!types.length) {
+      const li = document.createElement('li');
+      li.className = 'list-group-item text-muted small';
+      li.textContent = 'Nenhum tipo configurado.';
+      tiposList.appendChild(li);
+      return;
+    }
+    types.forEach(t => {
+      const li = document.createElement('li');
+      li.className = 'list-group-item d-flex align-items-center justify-content-between';
+      li.innerHTML = `
+        <div class="tipo-label small text-truncate" style="max-width:70%;">${escapeHtml(t.name)}</div>
+        <div class="btns">
+          <button class="btn btn-sm btn-outline-secondary me-1 tipo-edit" data-id="${t.id}">Editar</button>
+          <button class="btn btn-sm btn-outline-danger tipo-delete" data-id="${t.id}">Excluir</button>
+        </div>
+      `;
+      tiposList.appendChild(li);
+    });
+    // wire edits/deletes
+    tiposList.querySelectorAll('.tipo-delete').forEach(b => {
+      b.addEventListener('click', () => {
+        const id = Number((b as HTMLElement).getAttribute('data-id'));
+        const types = getDonationTypes().filter(x => x.id !== id);
+        saveDonationTypes(types);
+        refreshList();
+        populateDonationTypes();
+        showToast('Tipo excluído', 'warning');
+      });
+    });
+      tiposList.querySelectorAll('.tipo-edit').forEach(b => {
+      b.addEventListener('click', () => {
+        const id = Number((b as HTMLElement).getAttribute('data-id'));
+        const li = (b as HTMLElement).closest('li') as HTMLLIElement;
+        const label = li.querySelector('.tipo-label') as HTMLElement;
+        const current = label.textContent || '';
+        // hide the edit/delete buttons while editing
+        const btnsDiv = li.querySelector('.btns') as HTMLElement | null;
+        if (btnsDiv) btnsDiv.style.display = 'none';
+        // replace with input + save/cancel
+        const input = document.createElement('input');
+        input.className = 'form-control form-control-sm me-2';
+        input.value = current;
+        const saveBtn = document.createElement('button');
+        saveBtn.className = 'btn btn-sm btn-primary me-1';
+        saveBtn.textContent = 'Salvar';
+        const cancelBtn = document.createElement('button');
+        cancelBtn.className = 'btn btn-sm btn-secondary';
+        cancelBtn.textContent = 'Cancelar';
+        const holder = document.createElement('div');
+        holder.className = 'd-flex w-100 align-items-center';
+        holder.appendChild(input);
+        holder.appendChild(saveBtn);
+        holder.appendChild(cancelBtn);
+        label.replaceWith(holder);
+
+        cancelBtn.addEventListener('click', () => refreshList());
+        saveBtn.addEventListener('click', () => {
+          const v = input.value.trim();
+          if (!v) { showToast('Nome inválido', 'danger'); return; }
+          const types = getDonationTypes().map(x => x.id === id ? { id: x.id, name: v } : x);
+          saveDonationTypes(types);
+          refreshList();
+          populateDonationTypes();
+          showToast('Tipo atualizado', 'success');
+        });
+      });
+    });
+  }
+
+  addBtn.addEventListener('click', () => {
+    const v = (novoInput.value || '').trim();
+    if (!v) { showToast('Digite o nome do tipo', 'warning'); return; }
+    const types = getDonationTypes();
+    // avoid duplicates
+    if (types.some(t => t.name.toLowerCase() === v.toLowerCase())) { showToast('Tipo já existe', 'warning'); return; }
+    types.push({ id: Date.now(), name: v });
+    saveDonationTypes(types);
+    novoInput.value = '';
+    refreshList();
+    populateDonationTypes();
+    showToast('Tipo adicionado', 'success');
+  });
+
+  refreshList();
 }
 
