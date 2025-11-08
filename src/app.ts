@@ -195,6 +195,22 @@ document.addEventListener('DOMContentLoaded', () => {
   // Submissão de doação
   const doacaoForm = document.getElementById('doacaoForm') as HTMLFormElement | null;
   if (doacaoForm) {
+    // show selected filename in submissao.html
+    const fotoInput = document.getElementById('foto') as HTMLInputElement | null;
+    const fotoFilenameEl = document.getElementById('fotoFilename') as HTMLElement | null;
+    if (fotoInput && fotoFilenameEl) {
+      fotoInput.addEventListener('change', () => {
+        const name = (fotoInput.files && fotoInput.files.length) ? fotoInput.files[0].name : 'Nenhum arquivo selecionado';
+        fotoFilenameEl.textContent = 'Arquivo: ' + name;
+        // ensure wrapping so long names are visible (redundant with CSS but safe)
+        fotoFilenameEl.style.whiteSpace = 'normal';
+        fotoFilenameEl.style.wordBreak = 'break-all';
+        fotoFilenameEl.style.overflowWrap = 'anywhere';
+      });
+      // initialize
+      if (fotoInput.files && fotoInput.files.length) fotoFilenameEl.textContent = 'Arquivo: ' + fotoInput.files[0].name;
+    }
+
     doacaoForm.addEventListener('submit', (e) => {
       e.preventDefault();
       const foto = (document.getElementById('foto') as HTMLInputElement | null);

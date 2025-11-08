@@ -152,6 +152,17 @@ label {
   color: #2e7d32;
   font-weight: 500;
 }
+
+/* Mostrar nome de arquivo selecionado com quebras apropriadas */
+#fotoFilename {
+  display: block;
+  margin-top: 6px;
+  color: #6b6b6b;
+  font-size: 0.9rem;
+  white-space: normal !important;
+  word-break: break-all !important;
+  overflow-wrap: anywhere !important;
+}
 /* === Responsividade Eco Doação === */
 @media (max-width: 768px) {
   body {
