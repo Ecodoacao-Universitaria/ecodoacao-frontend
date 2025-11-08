@@ -141,6 +141,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <li class="nav-item"><a class="nav-link" href="dashboard.html">Painel</a></li>
             <li class="nav-item"><a class="nav-link" href="submissao.html">Nova Doação</a></li>
             <li class="nav-item"><a class="nav-link" href="historico.html">Histórico</a></li>
+            <li class="nav-item"><a class="nav-link" href="admin.html">Admin</a></li>
           </ul>
         </div>
       </div>
@@ -231,4 +232,135 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Preenche histórico se estivermos na página
   populateHistorico();
+
+  // Preenche painel de admin se estivermos na página
+  populateAdminPanel();
 });
+
+function populateAdminPanel() {
+  const panel = document.getElementById('adminPanel');
+  if (!panel) return;
+  const submissions = getSubmissions();
+  // consideramos pendentes aqueles com status contendo 'enviado' ou 'validação' ou 'pend'
+  const pending = submissions.filter(s => /enviado|valida|pend/i.test(s.status));
+  renderAdminPanel(panel, pending);
+}
+
+function renderAdminPanel(container: HTMLElement, submissions: Submission[]) {
+  container.innerHTML = '';
+
+  const card = document.createElement('div');
+  card.className = 'card shadow-sm';
+  const body = document.createElement('div');
+  body.className = 'card-body p-3';
+
+  const controls = document.createElement('div');
+  controls.className = 'mb-3';
+  // Responsive controls: checkbox on left, buttons take remaining space.
+  controls.innerHTML = `
+    <div class="d-flex align-items-center gap-3 w-100">
+      <div class="form-check d-flex align-items-center">
+        <input class="form-check-input me-2" type="checkbox" id="selectAllAdmin">
+        <label class="form-check-label small mb-0" for="selectAllAdmin">Selecionar todos</label>
+      </div>
+      <div class="d-flex flex-column flex-md-row gap-2 ms-auto w-100 w-md-75">
+        <button class="btn btn-success btn-sm flex-fill" id="approveSelected">Aprovar selecionados</button>
+        <button class="btn btn-danger btn-sm flex-fill" id="rejectSelected">Rejeitar selecionados</button>
+      </div>
+    </div>
+  `;
+
+  body.appendChild(controls);
+
+  const tableWrap = document.createElement('div');
+  tableWrap.className = 'table-responsive';
+
+  const table = document.createElement('table');
+  table.className = 'table table-hover mb-0';
+  table.innerHTML = `
+    <thead>
+      <tr>
+        <th style="width:40px"></th>
+        <th>Tipo</th>
+        <th>Descrição</th>
+        <th>Data</th>
+        <th>Status</th>
+        <th style="width:220px">Ações</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  `;
+
+  const tbody = table.querySelector('tbody') as HTMLTableSectionElement;
+  if (!submissions || submissions.length === 0) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td colspan="6" class="text-muted small">Nenhuma doação pendente.</td>`;
+    tbody.appendChild(tr);
+  } else {
+    submissions.forEach(s => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><input type="checkbox" class="admin-select" data-id="${s.id}"></td>
+        <td>${escapeHtml(s.tipo)}</td>
+        <td class="small text-muted">${escapeHtml(s.descricao)}</td>
+        <td class="small">${new Date(s.data).toLocaleString()}</td>
+        <td><span class="badge bg-warning text-dark">${escapeHtml(s.status)}</span></td>
+        <td>
+          <button class="btn btn-sm btn-outline-success me-1 admin-approve" data-id="${s.id}">Aprovar</button>
+          <button class="btn btn-sm btn-outline-danger admin-reject" data-id="${s.id}">Rejeitar</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  tableWrap.appendChild(table);
+  body.appendChild(tableWrap);
+  card.appendChild(body);
+  container.appendChild(card);
+
+  // Wire up controls
+  const selectAll = container.querySelector('#selectAllAdmin') as HTMLInputElement | null;
+  selectAll?.addEventListener('change', (e) => {
+    const checked = (e.target as HTMLInputElement).checked;
+    container.querySelectorAll<HTMLInputElement>('.admin-select').forEach(cb => cb.checked = checked);
+  });
+
+  container.querySelectorAll('.admin-approve').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = Number((btn as HTMLElement).getAttribute('data-id'));
+      updateSubmissionStatus(id, 'Aprovado');
+    });
+  });
+  container.querySelectorAll('.admin-reject').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = Number((btn as HTMLElement).getAttribute('data-id'));
+      updateSubmissionStatus(id, 'Rejeitado');
+    });
+  });
+
+  const approveSelected = container.querySelector('#approveSelected') as HTMLButtonElement | null;
+  const rejectSelected = container.querySelector('#rejectSelected') as HTMLButtonElement | null;
+  approveSelected?.addEventListener('click', () => {
+    const ids = Array.from(container.querySelectorAll<HTMLInputElement>('.admin-select:checked')).map(cb => Number(cb.getAttribute('data-id')));
+    ids.forEach(id => updateSubmissionStatus(id, 'Aprovado'));
+  });
+  rejectSelected?.addEventListener('click', () => {
+    const ids = Array.from(container.querySelectorAll<HTMLInputElement>('.admin-select:checked')).map(cb => Number(cb.getAttribute('data-id')));
+    ids.forEach(id => updateSubmissionStatus(id, 'Rejeitado'));
+  });
+}
+
+function updateSubmissionStatus(id: number, newStatus: string) {
+  const arr = getSubmissions();
+  const idx = arr.findIndex(s => s.id === id);
+  if (idx === -1) return;
+  arr[idx].status = newStatus;
+  // persist
+  localStorage.setItem('ecodoacao_submissions', JSON.stringify(arr));
+  showToast(`Doação ${id} marcada como ${newStatus}`, newStatus === 'Aprovado' ? 'success' : 'danger');
+  // refresh panels
+  populateAdminPanel();
+  populateHistorico();
+}
+

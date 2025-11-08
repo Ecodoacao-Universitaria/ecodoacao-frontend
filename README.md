@@ -25,8 +25,4 @@ npm run dev
 # abra a URL mostrada pelo Vite, ex.: http://localhost:5173/
 ```
 
-Notas:
-- A pasta `mock/` e o uso de `json-server` foram removidos do projeto para manter o frontend autônomo.
-- Se você quiser reintroduzir um backend de desenvolvimento (por exemplo, `json-server` ou um pequeno servidor Express para uploads), eu posso adicionar isso novamente como opção.
 
-Bom trabalho e aproveite o desenvolvimento!
