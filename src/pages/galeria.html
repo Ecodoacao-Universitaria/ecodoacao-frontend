@@ -59,15 +59,132 @@
         </div>
 
         <div class="col-12">
-          <div class="d-flex gap-2">
-            <a class="btn btn-outline-secondary" href="dashboard.html">Voltar ao Painel</a>
-            <a class="btn btn-outline-secondary" href="historico.html">Histórico</a>
+          <div class="d-flex justify-content-between align-items-center">
+            <div class="d-flex gap-2">
+              <a class="btn btn-outline-secondary" href="dashboard.html">Voltar ao Painel</a>
+              <a class="btn btn-outline-secondary" href="historico.html">Histórico</a>
+            </div>
+            <div>
+              <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#createBadgeModal" aria-label="Criar nova badge">Nova Bradge</button>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- Floating create-badge button removed — replaced by 'nova bradge' button in footer -->
+
+    <!-- Create Badge Modal -->
+    <div class="modal fade" id="createBadgeModal" tabindex="-1" aria-labelledby="createBadgeModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="createBadgeModalLabel">Criar nova badge</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <form id="createBadgeForm">
+              <div class="mb-3">
+                <label for="badgeName" class="form-label">Nome da badge</label>
+                <input type="text" class="form-control" id="badgeName" placeholder="Ex.: Reciclador Mestre" required>
+              </div>
+              <div class="mb-3">
+                <label for="badgeDescription" class="form-label">Descrição</label>
+                <textarea class="form-control" id="badgeDescription" rows="2" placeholder="Descreva como o usuário conquista essa badge" required></textarea>
+              </div>
+              <div class="mb-3">
+                <label for="badgeImage" class="form-label">Upload da imagem</label>
+                <input class="form-control" type="file" id="badgeImage" accept="image/*">
+                <div class="form-text">Recomendado: SVG (preferível) ou PNG/JPG com pelo menos 200×200 px — será exibido em 96×96 na galeria para melhor visualização.</div>
+              </div>
+              <div class="mb-3 text-center">
+                <img id="badgePreview" alt="Pré-visualização" style="max-width:160px;max-height:160px;border-radius:12px;display:none;border:1px solid #e9e9e9;padding:8px;" />
+                <div id="badgeSizeWarning" class="text-danger small mt-2" style="display:none;"></div>
+              </div>
+            </form>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button type="button" id="saveBadgeBtn" class="btn btn-success">Salvar badge</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Preview do arquivo e checagem simples de dimensão
+      (function(){
+        const input = document.getElementById('badgeImage');
+        const preview = document.getElementById('badgePreview');
+        const warning = document.getElementById('badgeSizeWarning');
+        const saveBtn = document.getElementById('saveBadgeBtn');
+
+        if (!input || !preview || !warning || !saveBtn) return;
+
+        input.addEventListener('change', (ev) => {
+          const file = (ev.target).files && (ev.target).files[0];
+          if (!file) {
+            preview.style.display = 'none';
+            warning.style.display = 'none';
+            return;
+          }
+
+          const url = URL.createObjectURL(file);
+          const img = new Image();
+          img.onload = () => {
+            preview.src = url;
+            preview.style.display = 'inline-block';
+            // Recommended size: 200x200 px
+            const recommendedW = 200, recommendedH = 200;
+            if (img.width < recommendedW || img.height < recommendedH) {
+              warning.textContent = `Aviso: imagem menor que ${recommendedW}×${recommendedH}px — pode ficar pixelada quando exibida.`;
+              warning.style.display = 'block';
+            } else {
+              warning.style.display = 'none';
+            }
+            URL.revokeObjectURL(url);
+          };
+          img.onerror = () => {
+            preview.style.display = 'none';
+            warning.textContent = 'Não foi possível carregar a imagem.';
+            warning.style.display = 'block';
+            URL.revokeObjectURL(url);
+          };
+          img.src = url;
+        });
+
+        // Save action (sem backend): mostra os dados no console e fecha modal
+        saveBtn.addEventListener('click', () => {
+          const name = (document.getElementById('badgeName')).value.trim();
+          const desc = (document.getElementById('badgeDescription')).value.trim();
+          const fileInput = (document.getElementById('badgeImage'));
+          const file = fileInput.files && fileInput.files[0];
+
+          if (!name || !desc) {
+            alert('Por favor preencha o nome e a descrição da badge.');
+            return;
+          }
+
+          // Em ambiente real, aqui faria upload para o servidor.
+          console.log('Criar badge:', { name, desc, file });
+
+          // Fechar modal
+          const modalEl = document.getElementById('createBadgeModal');
+          const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+          modal.hide();
+
+          // Limpar formulário
+          (document.getElementById('createBadgeForm')).reset();
+          preview.style.display = 'none';
+          warning.style.display = 'none';
+
+          // Feedback simples ao usuário
+          alert('Badge criada (localmente). Em produção a imagem seria enviada ao servidor.');
+        });
+      })();
+    </script>
+
     <script type="module" src="/src/core/app.ts"></script>
   </body>
 </html>
