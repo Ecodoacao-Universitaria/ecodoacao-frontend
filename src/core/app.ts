@@ -1,12 +1,28 @@
-// Import shared services
+// Importar serviços compartilhados
 import { injectNavbar } from '../services/navbar';
 import { populateDonationTypes } from '../services/donationType';
+import { initNotifications, addNotification } from '../services/notifications';
 
 document.addEventListener('DOMContentLoaded', () => {
-  // Inject navbar for navigation across pages
+  // Injetar navbar para navegação entre páginas
   injectNavbar();
 
-  // Setup links with data-href
+  // Initialize notifications (renders badge/dropdown)
+  initNotifications();
+  // Show immediate toast when a notification is created elsewhere
+  window.addEventListener('ecodoacao:notification', (ev: any) => {
+    try {
+      const d = ev?.detail || {};
+      const title = d.title ? String(d.title) : 'Notificação';
+      const message = d.message ? String(d.message) : '';
+      // Use success variant for approval-like notifications; that can be adjusted if needed
+      showToast(`${title}: ${message}`, 'success', 5000);
+    } catch (e) {
+      // ignore
+    }
+  });
+
+  // Configurar links com atributo data-href
   for (const el of document.querySelectorAll('[data-href]')) {
     el.addEventListener('click', () => {
       const target = (el as HTMLElement).dataset.href;
@@ -14,10 +30,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Populate donation types globally
+  // Popular tipos de doação globalmente
   populateDonationTypes();
 
-  // Setup page-specific functionality
+  // Configurar funcionalidades específicas por página
   setupPageSpecific();
 });
 
@@ -35,7 +51,7 @@ function setupPageSpecific() {
   setupAdminPage();
 }
 
-// ============ AUTH PAGES ============
+// ============ PÁGINAS DE AUTENTICAÇÃO ============
 function setupAuthPages() {
   setupLoginForm();
   setupCadastroForm();
@@ -84,7 +100,7 @@ function setupSubmissaoPage() {
   const doacaoForm = document.getElementById('doacaoForm');
   if (!doacaoForm) return;
 
-  // show selected filename in submissao.html
+  // mostrar o nome do arquivo selecionado em submissao.html
   const fotoInput = document.getElementById('foto') as HTMLInputElement;
   const fotoFilenameEl = document.getElementById('fotoFilename');
   if (fotoInput && fotoFilenameEl) {
@@ -122,7 +138,7 @@ function setupSubmissaoPage() {
   });
 }
 
-// ============ HISTÓRICO PAGE ============
+// ============ PÁGINA DE HISTÓRICO ============
 function setupHistoricoPage() {
   const list = document.getElementById('historicoList') as HTMLUListElement | null;
   if (!list) return;
@@ -158,7 +174,7 @@ function renderSubmissions(list: HTMLUListElement, submissions: any[]) {
   }
 }
 
-// ============ ADMIN PAGE ============
+// ============ PÁGINA DE ADMIN ============
 function setupAdminPage() {
   const panel = document.getElementById('adminPanel');
   if (!panel) return;
@@ -419,7 +435,7 @@ function renderTypesManagement(container: HTMLElement) {
   refreshList();
 }
 
-// ============ SHARED SERVICES ============
+// ============ SERVIÇOS COMPARTILHADOS ============
 function showToast(message: string, variant: 'success' | 'danger' | 'warning' = 'success', timeout = 3000) {
   const container = ensureToastContainer();
 
@@ -504,6 +520,13 @@ function updateSubmissionStatus(id: number, newStatus: string) {
     `Doação ${id} marcada como ${newStatus}`,
     newStatus === 'Aprovado' ? 'success' : 'danger'
   );
+  // Create a user notification when a submission is approved
+  if (newStatus === 'Aprovado') {
+    const s = arr[idx];
+    const title = 'Doação aprovada';
+    const message = s && s.tipo ? `Sua doação (${s.tipo}) foi aprovada.` : `Sua doação foi aprovada.`;
+    try { addNotification(title, message, '/src/pages/historico.html'); } catch (e) { /* ignore */ }
+  }
 }
 
 function getDonationTypes() {
