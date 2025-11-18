@@ -20,39 +20,63 @@
           <div class="card shadow-sm p-3">
             <h5>Badges Disponíveis</h5>
             <div class="d-flex gap-3 flex-wrap mt-3">
-              <div class="text-center">
+              <div class="text-center" data-badge-id="1" data-badge-title="Primeira Doação">
                 <img src="/src/assets/img/badge1.svg" alt="Primeira Doação" style="width:96px;height:96px;">
                 <div class="small mt-2">Primeira Doação</div>
                 <div class="text-muted small">Concedida na primeira doação registrada.</div>
+                <div class="mt-2 small text-success">Preço: <span class="badge-price">100</span> Moedas</div>
+                <div class="mt-2">
+                  <button class="btn btn-sm btn-outline-success buy-badge">Comprar</button>
+                </div>
               </div>
-              <div class="text-center">
+              <div class="text-center" data-badge-id="2" data-badge-title="Herói Verde">
                 <img src="/src/assets/img/badge2.svg" alt="Herói Verde" style="width:96px;height:96px;">
                 <div class="small mt-2">Herói Verde</div>
                 <div class="text-muted small">Doações frequentes que ajudam a comunidade.</div>
+                <div class="mt-2 small text-success">Preço: <span class="badge-price">200</span> Moedas</div>
+                <div class="mt-2">
+                  <button class="btn btn-sm btn-outline-success buy-badge">Comprar</button>
+                </div>
               </div>
-              <div class="text-center">
+              <div class="text-center" data-badge-id="3" data-badge-title="Reciclador Ouro">
                 <img src="/src/assets/img/badge3.svg" alt="Reciclador Ouro" style="width:96px;height:96px;">
                 <div class="small mt-2">Reciclador Ouro</div>
                 <div class="text-muted small">Alcance o nível ouro em reciclagem.</div>
+                <div class="mt-2 small text-success">Preço: <span class="badge-price">300</span> Moedas</div>
+                <div class="mt-2">
+                  <button class="btn btn-sm btn-outline-success buy-badge">Comprar</button>
+                </div>
               </div>
 
               <!-- Novas badges adicionadas -->
-              <div class="text-center">
+              <div class="text-center" data-badge-id="4" data-badge-title="Reciclagem Exemplar">
                 <img src="/src/assets/img/badge4.svg" alt="Reciclagem Exemplar" style="width:96px;height:96px;">
                 <div class="small mt-2">Reciclagem Exemplar</div>
                 <div class="text-muted small">Reconhecimento por separar corretamente os materiais.</div>
+                <div class="mt-2 small text-success">Preço: <span class="badge-price">150</span> Moedas</div>
+                <div class="mt-2">
+                  <button class="btn btn-sm btn-outline-success buy-badge">Comprar</button>
+                </div>
               </div>
 
-              <div class="text-center">
+              <div class="text-center" data-badge-id="5" data-badge-title="Estrela de Mérito">
                 <img src="/src/assets/img/badge5.svg" alt="Estrela de Mérito" style="width:96px;height:96px;">
                 <div class="small mt-2">Estrela de Mérito</div>
                 <div class="text-muted small">Concedida por contribuição exemplar em campanhas.</div>
+                <div class="mt-2 small text-success">Preço: <span class="badge-price">250</span> Moedas</div>
+                <div class="mt-2">
+                  <button class="btn btn-sm btn-outline-success buy-badge">Comprar</button>
+                </div>
               </div>
 
-              <div class="text-center">
+              <div class="text-center" data-badge-id="6" data-badge-title="Desafio Cumprido">
                 <img src="/src/assets/img/badge6.svg" alt="Desafio Cumprido" style="width:96px;height:96px;">
                 <div class="small mt-2">Desafio Cumprido</div>
                 <div class="text-muted small">Complete desafios mensais para desbloquear.</div>
+                <div class="mt-2 small text-success">Preço: <span class="badge-price">180</span> Moedas</div>
+                <div class="mt-2">
+                  <button class="btn btn-sm btn-outline-success buy-badge">Comprar</button>
+                </div>
               </div>
             </div>
           </div>
@@ -162,11 +186,11 @@
           const file = fileInput.files && fileInput.files[0];
 
           if (!name || !desc) {
-            alert('Por favor preencha o nome e a descrição da badge.');
+            if (globalThis.showToast) globalThis.showToast('Por favor preencha o nome e a descrição da badge.', 'warning'); else console.warn('Por favor preencha o nome e a descrição da badge.');
             return;
           }
 
-          // Em ambiente real, aqui faria upload para o servidor.
+          // upload para o servidor.
           console.log('Criar badge:', { name, desc, file });
 
           // Fechar modal
@@ -180,9 +204,61 @@
           warning.style.display = 'none';
 
           // Feedback simples ao usuário
-          alert('Badge criada (localmente). Em produção a imagem seria enviada ao servidor.');
+          if (globalThis.showToast) globalThis.showToast('Badge criada (localmente). Em produção a imagem seria enviada ao servidor.', 'success'); else console.log('Badge criada (localmente). Em produção a imagem seria enviada ao servidor.');
         });
       })();
+    </script>
+
+    <script type="module">
+      import { getBalance, getOwnedBadges, isOwned, purchaseBadge } from '/src/services/wallet.ts';
+
+      // Inicializa estado dos botões de compra
+      function initBuyButtons() {
+        const badgeEls = Array.from(document.querySelectorAll('.text-center[data-badge-id]'));
+        for (const el of badgeEls) {
+          const id = Number(el.dataset.badgeId);
+          const title = el.dataset.badgeTitle || '';
+          const priceEl = el.querySelector('.badge-price');
+          const btn = el.querySelector<HTMLButtonElement>('.buy-badge');
+          const price = priceEl ? Number(priceEl.textContent || '0') : 0;
+          if (!btn) continue;
+
+          function refresh() {
+            if (isOwned(id)) {
+              btn.textContent = 'Conquistada';
+              btn.className = 'btn btn-sm btn-success';
+              btn.disabled = true;
+            } else {
+              btn.textContent = 'Comprar';
+              btn.className = 'btn btn-sm btn-outline-success buy-badge';
+              btn.disabled = false;
+            }
+          }
+
+          btn.addEventListener('click', () => {
+            // tentar comprar
+            const ok = purchaseBadge(id, price, title);
+            if (!ok) {
+              // não há saldo suficiente — usar toast para UX consistente
+              if (typeof globalThis.showToast === 'function') {
+                globalThis.showToast('Saldo insuficiente', 'warning');
+              } else {
+                if (globalThis.showToast) globalThis.showToast('Saldo insuficiente para comprar esta badge.', 'warning'); else console.warn('Saldo insuficiente para comprar esta badge.');
+              }
+              return;
+            }
+            refresh();
+          });
+
+          refresh();
+        }
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initBuyButtons);
+      } else {
+        initBuyButtons();
+      }
     </script>
 
     <script type="module" src="/src/core/app.ts"></script>

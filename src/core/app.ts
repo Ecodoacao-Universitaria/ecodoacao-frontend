@@ -2,6 +2,7 @@
 import { injectNavbar } from '../services/navbar';
 import { populateDonationTypes } from '../services/donationType';
 import { initNotifications, addNotification } from '../services/notifications';
+import { getBalance, setBalance } from '../services/wallet';
 
 document.addEventListener('DOMContentLoaded', () => {
   // Injetar navbar para navegação entre páginas
@@ -9,6 +10,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Initialize notifications (renders badge/dropdown)
   initNotifications();
+  // Atualiza exibição do saldo na inicialização
+  try { const b = getBalance(); setBalance(b); } catch (e) { /* ignore */ }
   // Show immediate toast when a notification is created elsewhere
   window.addEventListener('ecodoacao:notification', (ev: any) => {
     try {
@@ -18,6 +21,43 @@ document.addEventListener('DOMContentLoaded', () => {
       // Use success variant for approval-like notifications; that can be adjusted if needed
       showToast(`${title}: ${message}`, 'success', 5000);
     } catch (e) {
+      // ignore
+    }
+  });
+
+  // Sincronização entre abas: atualizar saldo e badges quando localStorage mudar em outra aba
+  window.addEventListener('storage', (e: StorageEvent) => {
+    try {
+      if (!e.key) return;
+      if (e.key === 'ecodoacao_balance') {
+        const val = Number(localStorage.getItem('ecodoacao_balance') || '0');
+        const amount = document.getElementById('balanceAmount');
+        if (amount) amount.textContent = String(val);
+        const userBalance = document.getElementById('userBalance');
+        if (userBalance) userBalance.innerHTML = `💰 <span id="balanceAmount">${val}</span> Moedas`;
+      }
+      if (e.key === 'ecodoacao_owned_badges') {
+        const owned: number[] = JSON.parse(localStorage.getItem('ecodoacao_owned_badges') || '[]');
+        for (const el of Array.from(document.querySelectorAll('[data-badge-id]'))) {
+          const node = el as HTMLElement;
+          const id = Number(node.dataset.badgeId);
+          if (isNaN(id)) continue;
+          if (owned.includes(id)) {
+            node.classList.add('owned');
+            if (!node.querySelector('.owned-overlay')) {
+              const overlay = document.createElement('div');
+              overlay.className = 'owned-overlay';
+              overlay.innerHTML = '<span class="dot"></span><span style="margin-left:6px">Conquistada</span>';
+              node.appendChild(overlay);
+            }
+          } else {
+            node.classList.remove('owned');
+            const o = node.querySelector('.owned-overlay');
+            if (o) o.remove();
+          }
+        }
+      }
+    } catch (err) {
       // ignore
     }
   });
@@ -195,13 +235,13 @@ function renderAdminPanel(container: HTMLElement, submissions: any[]) {
   controls.className = 'mb-3';
   controls.innerHTML = `
     <div class="d-flex align-items-center gap-3 w-100">
-      <div class="form-check d-flex align-items-center">
-        <input class="form-check-input me-2" type="checkbox" id="selectAllAdmin">
-        <label class="form-check-label small mb-0" for="selectAllAdmin">Selecionar todos</label>
+      <div class="form-check form-switch d-flex align-items-center">
+        <input class="form-check-input" type="checkbox" id="selectAllAdmin">
+        <label class="form-check-label small text-muted ms-2 mb-0" for="selectAllAdmin">Selecionar todos</label>
       </div>
-      <div class="d-flex flex-column flex-md-row gap-2 ms-auto w-100 w-md-75">
-        <button class="btn btn-success btn-sm flex-fill" id="approveSelected">Aprovar selecionados</button>
-        <button class="btn btn-danger btn-sm flex-fill" id="rejectSelected">Rejeitar selecionados</button>
+      <div class="d-flex gap-2 justify-content-center w-100 mx-auto" style="max-width:720px;">
+        <button class="btn btn-success btn-sm px-3" id="approveSelected">Aprovar selecionados</button>
+        <button class="btn btn-danger btn-sm px-3" id="rejectSelected">Rejeitar selecionados</button>
       </div>
     </div>
   `;
@@ -233,7 +273,7 @@ function renderAdminPanel(container: HTMLElement, submissions: any[]) {
     tr.innerHTML = `<td colspan="6" class="text-muted small">Nenhuma doação pendente.</td>`;
     tbody.appendChild(tr);
   } else {
-    for (const s of submissions) {
+      for (const s of submissions) {
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td><input type="checkbox" class="admin-select" data-id="${s.id}"></td>
@@ -242,8 +282,8 @@ function renderAdminPanel(container: HTMLElement, submissions: any[]) {
         <td class="small">${new Date(s.data).toLocaleString()}</td>
         <td><span class="badge bg-warning text-dark">${escapeHtml(s.status)}</span></td>
         <td>
-          <button class="btn btn-sm btn-outline-success me-1 admin-approve" data-id="${s.id}">Aprovar</button>
-          <button class="btn btn-sm btn-outline-danger admin-reject" data-id="${s.id}">Rejeitar</button>
+          <button class="btn btn-sm btn-success me-1 admin-approve" data-id="${s.id}">Aprovar</button>
+          <button class="btn btn-sm btn-danger admin-reject" data-id="${s.id}">Rejeitar</button>
         </td>
       `;
       tbody.appendChild(tr);
@@ -316,9 +356,13 @@ function renderTypesManagement(container: HTMLElement) {
   body.className = 'card-body p-3';
   body.innerHTML = `
     <h5>Gerenciar Tipos de Doação</h5>
-    <div class="d-flex gap-2 mb-2">
-      <input id="novoTipoInput" class="form-control form-control-sm" placeholder="Novo tipo (ex: Materiais escolares)" />
-      <button id="addTipoBtn" class="btn btn-sm btn-primary">Adicionar</button>
+    <div class="admin-add-row mb-2">
+      <div>
+        <input id="novoTipoInput" class="form-control form-control-sm" placeholder="Novo tipo (ex: Materiais escolares)" />
+      </div>
+      <div style="display:flex;justify-content:center;">
+        <button id="addTipoBtn" class="btn btn-primary btn-sm admin-btn-fixed">Adicionar</button>
+      </div>
     </div>
     <ul id="tiposList" class="list-group list-group-flush"></ul>
   `;
@@ -345,8 +389,8 @@ function renderTypesManagement(container: HTMLElement) {
       li.innerHTML = `
         <div class="tipo-label small text-truncate" style="max-width:70%;">${escapeHtml(t.name)}</div>
         <div class="btns">
-          <button class="btn btn-sm btn-outline-secondary me-1 tipo-edit" data-id="${t.id}">Editar</button>
-          <button class="btn btn-sm btn-outline-danger tipo-delete" data-id="${t.id}">Excluir</button>
+          <button class="btn btn-sm btn-outline-secondary admin-btn-fixed me-1 tipo-edit" data-id="${t.id}">Editar</button>
+          <button class="btn btn-sm btn-outline-danger admin-btn-fixed tipo-delete" data-id="${t.id}">Excluir</button>
         </div>
       `;
       tiposList.appendChild(li);
@@ -486,6 +530,13 @@ function ensureToastContainer() {
     document.body.appendChild(container);
   }
   return container;
+}
+
+// Tornar showToast disponível globalmente para scripts simples no HTML
+try {
+  (globalThis as any).showToast = showToast;
+} catch (_) {
+  // ignore
 }
 
 function escapeHtml(s: string) {

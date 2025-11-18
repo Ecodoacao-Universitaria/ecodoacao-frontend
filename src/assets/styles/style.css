@@ -147,6 +147,78 @@ label {
   box-shadow: 0 2px 6px rgba(0,0,0,0.1);
 }
 
+/* Overlay para badges conquistadas */
+[data-badge-id] {
+  position: relative;
+  display: inline-block;
+}
+
+[data-badge-id].owned img {
+  opacity: 0.6;
+  filter: grayscale(40%);
+}
+
+[data-badge-id] .owned-overlay {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: rgba(25,135,84,0.95); /* verde forte */
+  color: #fff;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+}
+
+[data-badge-id] .owned-overlay .dot {
+  width: 8px;
+  height: 8px;
+  background: gold;
+  border-radius: 50%;
+  box-shadow: 0 0 4px rgba(255,215,0,0.7);
+}
+
+/* Botões administrativos com largura consistente */
+.admin-btn-fixed {
+  min-width: 110px;
+}
+
+/* Linha de adicionar tipos no admin alinhada à coluna de ações (220px) */
+.admin-add-row {
+  display: grid;
+  /* Reservar 220px para a coluna de ações (alinha com a tabela) */
+  grid-template-columns: calc(100% - 220px) 220px;
+  gap: 0.5rem;
+  align-items: center;
+  width: 100%;
+}
+
+@media (max-width: 576px) {
+  .admin-add-row {
+    grid-template-columns: 1fr;
+  }
+  .admin-btn-fixed {
+    width: 100%;
+  }
+}
+
+/* Alinhar a coluna de botões na lista de tipos com a coluna do botão adicionar */
+#tiposList .btns {
+  width: 220px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+#tiposList .tipo-label {
+  flex: 1 1 auto;
+  max-width: calc(100% - 220px);
+}
+
 .badge p {
   margin-top: 8px;
   color: #2e7d32;
