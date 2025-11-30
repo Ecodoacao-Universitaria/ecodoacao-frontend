@@ -1,609 +1,933 @@
-// Importar serviços compartilhados
-import { injectNavbar } from '../services/navbar';
-import { populateDonationTypes } from '../services/donationType';
-import { initNotifications, addNotification } from '../services/notifications';
+/**
+ * Aplicação principal - EcoDoação
+ * Gerencia inicialização e eventos globais
+ */
+import { initGaleria } from '../pages/galeria';
+import { injectNavbar, setNavbarUser } from '../utils/navbar';
+import { initNotifications, showToast, displayErrorToast } from '../utils/notifications';
+import { confirmAction, confirmWithInput } from '../utils/modals';
 import { getBalance, setBalance } from '../services/wallet';
+import { isAdmin } from '../utils/permissions'; 
+import { renderHistorico } from '../pages/historico';
+import { escapeHtml } from '../utils/html';
 
-document.addEventListener('DOMContentLoaded', () => {
-  // Injetar navbar para navegação entre páginas
-  injectNavbar();
+// ===== IMPORTS DA API =====
+import { login, isAuthenticated, requireAuth, redirectIfAuthenticated } from '../services/auth.services';
+import { registrarUsuario, getDashboard, atualizarPerfil, alterarSenha } from '../services/userService';
+import {
+  criarDoacao,
+  historicoUsuario,
+  listarDoacoesPendentes,
+  validarDoacao,
+  formatarDataDoacao,
+  validarImagemDoacao
+} from '../services/doacoes.services';
+import {
+  listarMinhasBadges,
+  listarBadgesDisponiveis,
+  comprarBadge,
+  formatarDataConquista,
+  criarBadgeAdmin 
+} from '../services/badge.services';
+import { populateDonationTypesSelects } from '../services/donationType';
+import { parseError } from '../services/errorHandling';
+import type { Doacao, Badge, UsuarioBadge } from '../types/api.types';
 
-  // Initialize notifications (renders badge/dropdown)
-  initNotifications();
-  // Atualiza exibição do saldo na inicialização
-  try { const b = getBalance(); setBalance(b); } catch (e) { /* ignore */ }
-  // Show immediate toast when a notification is created elsewhere
-  window.addEventListener('ecodoacao:notification', (ev: any) => {
-    try {
-      const d = ev?.detail || {};
-      const title = d.title ? String(d.title) : 'Notificação';
-      const message = d.message ? String(d.message) : '';
-      // Use success variant for approval-like notifications; that can be adjusted if needed
-      showToast(`${title}: ${message}`, 'success', 5000);
-    } catch (e) {
-      // ignore
-    }
-  });
-
-  // Sincronização entre abas: atualizar saldo e badges quando localStorage mudar em outra aba
-  window.addEventListener('storage', (e: StorageEvent) => {
-    try {
-      if (!e.key) return;
-      if (e.key === 'ecodoacao_balance') {
-        const val = Number(localStorage.getItem('ecodoacao_balance') || '0');
-        const amount = document.getElementById('balanceAmount');
-        if (amount) amount.textContent = String(val);
-        const userBalance = document.getElementById('userBalance');
-        if (userBalance) userBalance.innerHTML = `💰 <span id="balanceAmount">${val}</span> Moedas`;
-      }
-      if (e.key === 'ecodoacao_owned_badges') {
-        const owned: number[] = JSON.parse(localStorage.getItem('ecodoacao_owned_badges') || '[]');
-        for (const el of Array.from(document.querySelectorAll('[data-badge-id]'))) {
-          const node = el as HTMLElement;
-          const id = Number(node.dataset.badgeId);
-          if (isNaN(id)) continue;
-          if (owned.includes(id)) {
-            node.classList.add('owned');
-            if (!node.querySelector('.owned-overlay')) {
-              const overlay = document.createElement('div');
-              overlay.className = 'owned-overlay';
-              overlay.innerHTML = '<span class="dot"></span><span style="margin-left:6px">Conquistada</span>';
-              node.appendChild(overlay);
-            }
-          } else {
-            node.classList.remove('owned');
-            const o = node.querySelector('.owned-overlay');
-            if (o) o.remove();
-          }
-        }
-      }
-    } catch (err) {
-      // ignore
-    }
-  });
-
-  // Configurar links com atributo data-href
-  for (const el of document.querySelectorAll('[data-href]')) {
-    el.addEventListener('click', () => {
-      const target = (el as HTMLElement).dataset.href;
-      if (target) globalThis.location.href = target;
-    });
-  }
-
-  // Popular tipos de doação globalmente
-  populateDonationTypes();
-
-  // Configurar funcionalidades específicas por página
-  setupPageSpecific();
-});
-
-function setupPageSpecific() {
-  // Auth pages (login and cadastro)
-  setupAuthPages();
-  
-  // Submissão page
-  setupSubmissaoPage();
-  
-  // Histórico page
-  setupHistoricoPage();
-  
-  // Admin page
-  setupAdminPage();
+// ===== INICIALIZAÇÃO =====
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initApp);
+} else {
+  initApp();
 }
 
-// ============ PÁGINAS DE AUTENTICAÇÃO ============
-function setupAuthPages() {
-  setupLoginForm();
-  setupCadastroForm();
-}
 
-function setupLoginForm() {
-  const loginForm = document.getElementById('loginForm') as HTMLFormElement | null;
-  if (loginForm) {
-    loginForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const email = ((document.getElementById('email') as HTMLInputElement)?.value) || '';
-      if (!email.endsWith('@ufrpe.br')) {
-        showToast('Use seu e-mail institucional (@ufrpe.br)', 'danger');
-        return;
-      }
-      showToast('Login realizado com sucesso!', 'success');
-      setTimeout(() => (globalThis.location.href = 'dashboard.html'), 700);
-    });
-  }
-}
+function initRouting() {
+  const path = window.location.pathname;
+  const file = path.split('/').pop() || '';
 
-function setupCadastroForm() {
-  const cadastroForm = document.getElementById('cadastroForm') as HTMLFormElement | null;
-  if (cadastroForm) {
-    cadastroForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const email = ((document.getElementById('email') as HTMLInputElement)?.value) || '';
-      const senha = ((document.getElementById('senha') as HTMLInputElement)?.value) || '';
-      const confirmar = ((document.getElementById('confirmar') as HTMLInputElement)?.value) || '';
-      if (!email.endsWith('@ufrpe.br')) {
-        showToast('O e-mail deve ser institucional (@ufrpe.br)', 'danger');
-        return;
-      }
-      if (senha !== confirmar) {
-        showToast('As senhas não coincidem!', 'warning');
-        return;
-      }
-      showToast('Cadastro realizado com sucesso!', 'success');
-      setTimeout(() => (globalThis.location.href = 'dashboard.html'), 700);
-    });
-  }
-}
+  const protectedPages = [
+    'dashboard.html',
+    'admin.html',
+    'submissao.html',
+    'historico.html',
+    'galeria.html',
+    'badges.html',
+    'perfil.html'
+  ];
 
-// ============ SUBMISSÃO PAGE ============
-function setupSubmissaoPage() {
-  const doacaoForm = document.getElementById('doacaoForm');
-  if (!doacaoForm) return;
+  const publicPages = [
+    '',
+    '/',
+    'index.html',
+    'login.html',
+    'cadastro.html'
+  ];
 
-  // mostrar o nome do arquivo selecionado em submissao.html
-  const fotoInput = document.getElementById('foto') as HTMLInputElement;
-  const fotoFilenameEl = document.getElementById('fotoFilename');
-  if (fotoInput && fotoFilenameEl) {
-    fotoInput.addEventListener('change', () => {
-      const name = fotoInput.files?.[0]?.name ?? 'Nenhum arquivo selecionado';
-      fotoFilenameEl.textContent = 'Arquivo: ' + name;
-      fotoFilenameEl.style.whiteSpace = 'normal';
-      fotoFilenameEl.style.wordBreak = 'break-all';
-      fotoFilenameEl.style.overflowWrap = 'anywhere';
-    });
-    if (fotoInput.files?.[0]) fotoFilenameEl.textContent = 'Arquivo: ' + fotoInput.files[0].name;
-  }
-
-  doacaoForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const foto = document.getElementById('foto') as HTMLInputElement;
-    if (!foto?.files?.[0]) {
-      showToast('Envie uma foto da doação.', 'warning');
+  if (protectedPages.includes(file)) {
+    if (!requireAuth()) return;
+    // proteção extra para admin
+    if (file === 'admin.html' && !isAdmin()) {
+      window.location.href = '/src/pages/dashboard.html';
       return;
     }
-    const tipo = (document.getElementById('tipo') as HTMLSelectElement)?.value ?? 'Outro';
-    const descricao = (document.getElementById('descricao') as HTMLInputElement)?.value ?? '';
-    const arquivoNome = foto.files[0].name;
-    const submission = {
-      id: Date.now(),
-      tipo,
-      descricao,
-      arquivoNome,
-      data: new Date().toISOString(),
-      status: 'Enviado para validação'
-    };
-    saveSubmission(submission);
-    showToast('Doação salva localmente e enviada para validação (simulado)', 'success');
-    setTimeout(() => (globalThis.location.href = 'historico.html'), 700);
+  } else if (publicPages.includes(file)) {
+    if (redirectIfAuthenticated()) return;
+  }
+}
+
+async function initApp(): Promise<void> {
+  // Primeiro decide rota (evita executar setups da página errada)
+  initRouting();
+
+  // Componentes visuais
+  injectNavbar();
+  initNotifications();
+  
+  // Sincronizar saldo
+  syncBalance();
+  
+  // Hidratar nome do usuário na navbar
+  await hydrateNavbarUser();
+
+  // Listeners globais
+  //setupGlobalListeners();
+  
+  // Links com data-href
+  setupDataHrefLinks();
+  
+  // Setup específico da página
+  await setupPageSpecific();
+}
+
+// ===== LISTENERS GLOBAIS =====
+function setupGlobalListeners(): void {
+  // Outros listeners globais futuros podem vir aqui(seja lá quais)
+}
+
+async function hydrateNavbarUser(): Promise<void> {
+  try {
+    if (!isAuthenticated()) return;
+    const dash: any = await getDashboard();
+    const nome = dash?.username || dash?.user?.username || dash?.nome || '';
+    if (nome) setNavbarUser(nome);
+  } catch {}
+}
+
+function setupDataHrefLinks(): void {
+  document.querySelectorAll('[data-href]').forEach(el => {
+    el.addEventListener('click', () => {
+      const target = (el as HTMLElement).dataset.href;
+      if (target) location.href = target;
+    });
   });
 }
 
-// ============ PÁGINA DE HISTÓRICO ============
-function setupHistoricoPage() {
-  const list = document.getElementById('historicoList') as HTMLUListElement | null;
-  if (!list) return;
-  const submissions = getSubmissions();
-  renderSubmissions(list, submissions);
+// ===== SETUP POR PÁGINA =====
+async function setupPageSpecific(): Promise<void> {
+  const pathname = location.pathname;
+
+  // Autenticação
+  if (pathname.includes('login.html')) setupLoginPage();
+  if (pathname.includes('cadastro.html')) setupCadastroPage();
+  
+  // Usuário
+  if (pathname.includes('submissao.html')) await setupSubmissaoPage();
+  if (pathname.includes('historico.html')) await setupHistoricoPage();
+  if (pathname.includes('dashboard.html')) await setupDashboardPage();
+  if (pathname.includes('badges.html')) await setupBadgesPage();
+  if (pathname.includes('perfil.html')) await setupPerfilPage();
+   if (pathname.includes('galeria.html')) { 
+    const adminBanner = document.getElementById('adminBanner');
+    const newBadgeBtn = document.getElementById('newBadgeBtn') as HTMLButtonElement | null;
+    const admin = isAdmin(); 
+    if (adminBanner) adminBanner.style.display = admin ? 'block' : 'none';
+    if (newBadgeBtn) newBadgeBtn.style.display = admin ? 'inline-block' : 'none';
+
+    // Admin handlers para criação de badge
+    if (admin) initCreateBadgeHandlers();
+
+    await initGaleria();
+  }
+
+  // Admin
+  if (pathname.includes('admin.html')) await setupAdminPage();
 }
 
-function renderSubmissions(list: HTMLUListElement, submissions: any[]) {
-  list.innerHTML = '';
-  if (!submissions?.length) {
-    const li = document.createElement('li');
-    li.className = 'list-group-item text-muted';
-    li.innerText = 'Nenhuma doação registrada ainda.';
-    list.appendChild(li);
+// ============================================================================
+// AUTENTICAÇÃO
+// ============================================================================
+
+function setupLoginPage(): void {
+  const form = document.getElementById('loginForm') as HTMLFormElement;
+  if (!form) return;
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const username = (document.getElementById('username') as HTMLInputElement)?.value.trim();
+    const senha = (document.getElementById('senha') as HTMLInputElement)?.value || '';
+    if (!username) { showToast('Informe seu username.', 'warning'); return; }
+    try {
+      await login({ username, password: senha });
+      showToast('Login realizado.', 'success');
+      setTimeout(() => location.href = '/src/pages/dashboard.html', 500);
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail || 'Falha no login.';
+      showToast(msg, 'danger', 5000);
+    }
+  });
+}
+
+function setupCadastroPage(): void {
+  const form = document.getElementById('cadastroForm') as HTMLFormElement;
+  if (!form) return;
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const username = (document.getElementById('username') as HTMLInputElement)?.value.trim();
+    const email = (document.getElementById('email') as HTMLInputElement)?.value.trim().toLowerCase();
+    const senha = (document.getElementById('senha') as HTMLInputElement)?.value;
+    const confirmar = (document.getElementById('confirmar') as HTMLInputElement)?.value;
+    if (!username) { showToast('Informe username.', 'warning'); return; }
+    if (!email.endsWith('@ufrpe.br')) { showToast('E-mail deve ser @ufrpe.br.', 'warning'); return; }
+    if (senha !== confirmar) { showToast('Senhas não coincidem.', 'warning'); return; }
+    if (senha.length < 6) { showToast('Senha mínima 6 caracteres.', 'warning'); return; }
+    try {
+      const novo = await registrarUsuario({ username, email, password: senha });
+      showToast('Conta criada.', 'success');
+      // Login direto
+      await login({ username: novo.username, password: senha });
+      showToast('Autenticado.', 'success');
+      setTimeout(() => location.href = '/src/pages/dashboard.html', 600);
+    } catch (err: any) {
+      const data = err?.response?.data;
+      const userErr = Array.isArray(data?.username) ? data.username.join(', ') : '';
+      const msg = userErr
+        ? 'Username já existe. Faça login.'
+        : data?.detail
+          || Object.keys(data || {}).map(k => `${k}: ${Array.isArray(data[k]) ? data[k].join(', ') : data[k]}`).join(' | ')
+          || 'Falha no cadastro.';
+      showToast(msg, 'danger', 6000);
+      //if (userErr) setTimeout(() => location.href = '/src/pages/login.html', 1000);
+    }
+  });
+}
+
+// ============================================================================
+// DASHBOARD
+// ============================================================================
+
+async function setupDashboardPage(): Promise<void> {
+  const container = document.getElementById('dashboardContent');
+  if (!container) return;
+
+  try {
+    const dashboard = await getDashboard();
+    const minhasBadges = await listarMinhasBadges();
+
+    // Atualiza estado e UI do saldo
+    setBalance(dashboard.saldo_moedas);
+    updateBalanceUI(dashboard.saldo_moedas);
+
+    container.innerHTML = '';
+
+    renderDashboardStats(container, dashboard, minhasBadges.length);
+    renderDashboardBadges(container, minhasBadges);
+  } catch (error) {
+    showToast('Erro ao carregar dashboard', 'danger');
+    console.error(error);
+  }
+}
+
+function renderDashboardStats(container: HTMLElement, data: any, badgesCount?: number): void {
+  const qtdBadges = typeof badgesCount === 'number'
+    ? badgesCount
+    : (data.badges_conquistados?.length || 0);
+
+  const statsHTML = `
+    <div class="row g-3 mb-4">
+      <div class="col-md-4">
+        <div class="card text-center">
+          <div class="card-body">
+            <h3 class="text-success">${data.saldo_moedas}</h3>
+            <p class="text-muted mb-0">Moedas</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card text-center">
+          <div class="card-body">
+            <h3 class="text-primary">${qtdBadges}</h3>
+            <p class="text-muted mb-0">Badges</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card text-center">
+          <div class="card-body">
+            <h3 class="text-info">${data.role}</h3>
+            <p class="text-muted mb-0">Nível</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  container.insertAdjacentHTML('afterbegin', statsHTML);
+}
+
+function renderDashboardBadges(container: HTMLElement, badges: any[]): void {
+  const section = document.createElement('div');
+  section.className = 'mb-4';
+  section.innerHTML = '<h5 class="mb-3">Badges Conquistadas Recentemente</h5>';
+
+  if (!Array.isArray(badges) || badges.length === 0) {
+    section.innerHTML += '<p class="text-muted">Nenhuma badge conquistada ainda.</p>';
+    container.appendChild(section);
     return;
   }
-  for (const s of submissions) {
-    const li = document.createElement('li');
-    li.className = 'list-group-item d-flex justify-content-between align-items-start';
-    const left = document.createElement('div');
-    left.innerHTML = `<div class="fw-bold">${escapeHtml(s.tipo)}</div><div class="text-muted small">${escapeHtml(s.descricao)}</div><div class="text-muted small">${new Date(s.data).toLocaleString()}</div>`;
-    const right = document.createElement('div');
-    let badgeClass = 'bg-secondary';
-    if (s.status.toLowerCase().includes('aprov')) {
-      badgeClass = 'bg-success';
-    } else if (s.status.toLowerCase().includes('enviado')) {
-      badgeClass = 'bg-warning text-dark';
-    }
-    right.innerHTML = `<span class="badge ${badgeClass}">${escapeHtml(s.status)}</span>`;
-    li.appendChild(left);
-    li.appendChild(right);
-    list.appendChild(li);
+
+  const grid = document.createElement('div');
+  grid.className = 'row g-3';
+
+  badges.slice(0, 6).forEach((raw: any) => {
+    const b = raw?.badge ? raw.badge : raw; 
+    const icone = b?.icone || '🏆';
+    const nome = b?.nome || 'Badge';
+    const desc = b?.descricao || '';
+    grid.innerHTML += `
+      <div class="col-md-4">
+        <div class="card">
+          <div class="card-body text-center">
+            <div class="mb-2">${icone}</div>
+            <h6>${escapeHtml(nome)}</h6>
+            <p class="small text-muted mb-0">${escapeHtml(desc)}</p>
+          </div>
+        </div>
+      </div>
+    `;
+  });
+
+  section.appendChild(grid);
+  container.appendChild(section);
+}
+
+// ============================================================================
+// PERFIL
+// ============================================================================
+
+async function setupPerfilPage(): Promise<void> {
+  const formPerfil = document.getElementById('perfilForm') as HTMLFormElement | null;
+  const formSenha = document.getElementById('senhaForm') as HTMLFormElement | null;
+  const inputUsername = document.getElementById('perfilUsername') as HTMLInputElement | null;
+  const inputEmail = document.getElementById('perfilEmail') as HTMLInputElement | null;
+  const displayUsername = document.getElementById('perfilUsernameDisplay');
+  const displayEmail = document.getElementById('perfilEmailDisplay');
+  const btnSalvar = document.querySelector('#perfilForm button[type="submit"]') as HTMLButtonElement | null;
+
+  let originalUsername = '';
+  let originalEmail = '';
+
+  // Preload
+  try {
+    const dash: any = await getDashboard();
+    const username = dash?.username || dash?.user?.username || '';
+    const email = (dash?.email || dash?.user?.email || '').toLowerCase();
+    originalUsername = username || '';
+    originalEmail = email || '';
+
+    if (inputUsername && username) inputUsername.value = username;
+    if (inputEmail && email) inputEmail.value = email;
+    if (displayUsername && username) displayUsername.textContent = username;
+    if (displayEmail && email) displayEmail.textContent = email;
+    if (username) setNavbarUser(username);
+  } catch (e) {
+    console.warn('Falha preload perfil', e);
+  }
+
+  const updateSubmitState = () => {
+    const curUser = (inputUsername?.value || '').trim();
+    const curEmail = (inputEmail?.value || '').trim().toLowerCase();
+    const changed = (curUser !== originalUsername) || (curEmail !== originalEmail);
+    if (btnSalvar) btnSalvar.disabled = !changed;
+  };
+
+  inputUsername?.addEventListener('input', updateSubmitState);
+  inputEmail?.addEventListener('input', updateSubmitState);
+  updateSubmitState();
+
+  if (formPerfil) {
+    formPerfil.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const username = inputUsername?.value.trim();
+      const email = (inputEmail?.value?.trim()?.toLowerCase()) || '';
+
+      // Bloqueia se nada mudou
+      if (username === originalUsername && email === originalEmail) {
+        showToast('Nenhuma alteração detectada.', 'info');
+        return;
+      }
+
+      if (!username) { showToast('Informe username.', 'warning'); return; }
+      if (!email.endsWith('@ufrpe.br')) { showToast('E-mail deve terminar com @ufrpe.br', 'warning'); return; }
+      try {
+        const user = await atualizarPerfil({ username, email });
+        showToast('Perfil atualizado.', 'success');
+        if (displayUsername) displayUsername.textContent = user.username;
+        if (displayEmail) displayEmail.textContent = user.email.toLowerCase();
+        setNavbarUser(user.username);
+
+        // Atualiza baseline e estado do botão
+        originalUsername = user.username;
+        originalEmail = user.email.toLowerCase();
+        updateSubmitState();
+      } catch (err: any) {
+        const data = err?.response?.data || {};
+        const msg = data?.detail
+          || Object.keys(data).map(k => `${k}: ${Array.isArray(data[k]) ? data[k].join(', ') : data[k]}`).join(' | ')
+          || 'Erro ao atualizar.';
+        showToast(msg, 'danger', 6000);
+      }
+    });
+  }
+
+  if (formSenha) {
+    formSenha.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const atual = (document.getElementById('senhaAtual') as HTMLInputElement)?.value || '';
+      const nova = (document.getElementById('novaSenha') as HTMLInputElement)?.value || '';
+      const confirmar = (document.getElementById('confirmarNovaSenha') as HTMLInputElement)?.value || '';
+      if (nova !== confirmar) { showToast('Senhas não coincidem.', 'warning'); return; }
+      if (nova.length < 6 || !/[A-Za-z]/.test(nova) || !/\d/.test(nova)) {
+        showToast('Senha fraca (>=6, letra e número).', 'warning'); return;
+      }
+      try {
+        const resp = await alterarSenha({ senha_atual: atual, nova_senha: nova });
+        showToast(resp.detail || 'Senha alterada.', 'success');
+        ['senhaAtual','novaSenha','confirmarNovaSenha'].forEach(id => {
+          const el = document.getElementById(id) as HTMLInputElement | null;
+          if (el) el.value = '';
+        });
+      } catch (err: any) {
+        const data = err?.response?.data || {};
+        const msg = data?.detail
+          || Object.keys(data).map(k => `${k}: ${Array.isArray(data[k]) ? data[k].join(', ') : data[k]}`).join(' | ')
+          || 'Erro ao alterar senha.';
+        showToast(msg, 'danger', 6000);
+      }
+    });
   }
 }
 
-// ============ PÁGINA DE ADMIN ============
-function setupAdminPage() {
-  const panel = document.getElementById('adminPanel');
-  if (!panel) return;
-  const submissions = getSubmissions();
-  const pending = submissions.filter((s: any) => /enviado|valida|pend/i.test(s.status));
-  renderAdminPanel(panel, pending);
+// ============================================================================
+// SUBMISSÃO DE DOAÇÃO
+// ============================================================================
+
+async function setupSubmissaoPage(): Promise<void> {
+  const form = document.getElementById('doacaoForm') as HTMLFormElement;
+  if (!form) return;
+
+  const fotoInput = document.getElementById('foto') as HTMLInputElement;
+  const tipoSelect = document.getElementById('tipo') as HTMLSelectElement;
+  const descInput = document.getElementById('descricao') as HTMLInputElement;
+  const fotoFilename = document.getElementById('fotoFilename');
+
+  try {
+    await populateDonationTypesSelects();
+    if (tipoSelect) tipoSelect.disabled = false;
+  } catch (err) {
+    console.error('Falha ao carregar tipos de doação:', err);
+    showToast('Erro ao carregar tipos de doação.', 'warning');
+    if (tipoSelect) {
+      tipoSelect.innerHTML = '<option value="">Erro ao carregar</option>';
+      tipoSelect.disabled = true;
+    }
+  }
+
+  // pré-visualização
+  const previewImgId = 'doacaoPreviewImg';
+  let previewImg = document.getElementById(previewImgId) as HTMLImageElement | null;
+  if (!previewImg) {
+    previewImg = document.createElement('img');
+    previewImg.id = previewImgId;
+    previewImg.className = 'img-fluid rounded border mt-2';
+    previewImg.style.maxHeight = '220px';
+    fotoFilename?.insertAdjacentElement('afterend', previewImg);
+  }
+  fotoInput?.addEventListener('change', () => {
+    const file = fotoInput.files?.[0];
+    if (file) {
+      fotoFilename && (fotoFilename.textContent = `Arquivo: ${file.name}`);
+      const url = URL.createObjectURL(file);
+      if (previewImg) {
+        previewImg.src = url;
+        previewImg.alt = 'Pré-visualização da doação';
+        previewImg.style.display = 'block';
+      }
+    } else {
+      fotoFilename && (fotoFilename.textContent = 'Nenhum arquivo selecionado');
+      if (previewImg) {
+        previewImg.src = '';
+        previewImg.style.display = 'none';
+      }
+    }
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const file = fotoInput?.files?.[0];
+    if (!file) { showToast('Envie uma foto da doação.', 'warning'); return; }
+    const valid = validarImagemDoacao(file);
+    if (valid !== true) { showToast(valid, 'warning'); return; }
+
+    const tipoId = Number(tipoSelect?.value);
+    if (!tipoId || Number.isNaN(tipoId)) { showToast('Selecione um tipo de doação válido.', 'warning'); return; }
+
+    const desc = (descInput?.value || '').trim();
+    if (desc && (desc.length < 10 || desc.length > 240)) {
+      showToast('A descrição deve ter entre 10 e 240 caracteres.', 'warning');
+      return;
+    }
+
+    try {
+      await criarDoacao({
+        tipo_doacao: tipoId,
+        descricao: descInput?.value?.trim() || '',
+        evidencia_foto: file,
+      });
+      showToast('Doação enviada para validação!', 'success');
+      setTimeout(() => location.href = 'historico.html', 700);
+    } catch (error) {
+      displayErrorToast(error, 'Erro ao enviar doação.');
+    }
+  });
 }
 
-function renderAdminPanel(container: HTMLElement, submissions: any[]) {
+// ============================================================================
+// HISTÓRICO
+// ============================================================================
+
+async function setupHistoricoPage(): Promise<void> {
+  const list = document.getElementById('historicoList') as HTMLUListElement;
+  if (!list) return;
+
+  list.innerHTML = '<li class="list-group-item">Carregando...</li>';
+
+  try {
+    const response = await historicoUsuario();
+    const historicoItems = (response.results || []).map((r: any) => {
+      const tipo = r?.tipo_doacao;
+      return {
+        ...r,
+        tipo_doacao: typeof tipo === 'string' ? { id: 0, nome: tipo } : tipo
+      };
+    });
+    renderHistorico(list, historicoItems);
+  } catch (error) {
+    list.innerHTML = '<li class="list-group-item text-danger">Erro ao carregar histórico.</li>';
+    displayErrorToast(error, 'Erro ao carregar histórico.');
+  }
+}
+
+
+// ============================================================================
+// BADGES
+// ============================================================================
+
+async function setupBadgesPage(): Promise<void> {
+  const container = document.getElementById('badgesContainer');
+  if (!container) return;
+
+  try {
+    const [minhas, disponiveis] = await Promise.all([
+      listarMinhasBadges(),
+      listarBadgesDisponiveis(),
+    ]);
+
+    renderMinhasBadges(container, minhas);
+    renderBadgesDisponiveis(container, disponiveis);
+  } catch (error) {
+    showToast('Erro ao carregar badges', 'danger');
+    console.error(error);
+  }
+}
+
+function renderMinhasBadges(container: HTMLElement, badges: UsuarioBadge[]): void {
+  const section = document.createElement('div');
+  section.className = 'mb-5';
+  section.innerHTML = `
+    <h4 class="mb-3">🏆 Minhas Badges (${badges.length})</h4>
+    <div class="row g-3" id="minhasBadgesGrid"></div>
+  `;
+
+  const grid = section.querySelector('#minhasBadgesGrid')!;
+
+  if (badges.length === 0) {
+    grid.innerHTML = '<div class="col-12"><p class="text-muted">Você ainda não conquistou nenhuma badge.</p></div>';
+  } else {
+    badges.forEach(ub => {
+      grid.innerHTML += `
+        <div class="col-md-4">
+          <div class="card badge-card owned">
+            <div class="card-body text-center">
+              <div class="badge-icon mb-2">${ub.badge.icone || '🏆'}</div>
+              <h6>${escapeHtml(ub.badge.nome)}</h6>
+              <p class="small text-muted">${escapeHtml(ub.badge.descricao)}</p>
+              <p class="small text-success mb-0">Conquistada em: ${formatarDataConquista(ub.data_conquista)}</p>
+            </div>
+          </div>
+        </div>
+      `;
+    });
+  }
+
+  container.appendChild(section);
+}
+
+function renderBadgesDisponiveis(container: HTMLElement, badges: Badge[]): void {
+  const section = document.createElement('div');
+  section.innerHTML = `
+    <h4 class="mb-3">💎 Badges Disponíveis (${badges.length})</h4>
+    <div class="row g-3" id="badgesDisponiveisGrid"></div>
+  `;
+
+  const grid = section.querySelector('#badgesDisponiveisGrid')!;
+
+  if (badges.length === 0) {
+    grid.innerHTML = '<div class="col-12"><p class="text-muted">Você já possui todas as badges disponíveis!</p></div>';
+  } else {
+    badges.forEach(badge => {
+      grid.innerHTML += `
+        <div class="col-md-4">
+          <div class="card badge-card">
+            <div class="card-body text-center">
+              <div class="badge-icon mb-2">${badge.icone || '💎'}</div>
+              <h6>${escapeHtml(badge.nome)}</h6>
+              <p class="small text-muted">${escapeHtml(badge.descricao)}</p>
+              <p class="fw-bold text-primary">${badge.custo_moedas} moedas</p>
+              <button class="btn btn-sm btn-primary comprar-badge" data-badge-id="${badge.id}" data-custo="${badge.custo_moedas}">
+                Comprar
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    });
+
+    // Event listeners para compra
+    grid.addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement).closest('.comprar-badge') as HTMLButtonElement | null;
+      if (!btn) return;
+      const badgeId = Number(btn.dataset.badgeId);
+      const custo = Number(btn.dataset.custo);
+      handleComprarBadge(badgeId, custo);
+    });
+  }
+  container.appendChild(section);
+}
+
+async function handleComprarBadge(badgeId: number, custo: number): Promise<void> {
+  const ok = await confirmAction({
+    title: 'Comprar badge?',
+    message: `Confirma a compra por ${custo} moedas?`,
+    confirmText: 'Comprar',
+    cancelText: 'Cancelar',
+    variant: 'primary'
+  });
+  if (!ok) return;
+
+  try {
+    const resultado = await comprarBadge(badgeId);
+    if (resultado.sucesso) {
+      showToast(resultado.mensagem, 'success');
+      if (typeof resultado.saldo_restante === 'number') {
+        setBalance(resultado.saldo_restante);
+      }
+      setTimeout(() => location.reload(), 800);
+    } else {
+      showToast(resultado.mensagem || 'Falha na compra.', 'warning');
+    }
+  } catch (error: any) {
+    displayErrorToast(error, 'Erro ao comprar badge.');
+  }
+}
+
+// ===== CRIAÇÃO DE BADGE (ADMIN) =====
+function initCreateBadgeHandlers(): void {
+  const form = document.getElementById('createBadgeForm') as HTMLFormElement | null;
+  const imgInput = document.getElementById('badgeImage') as HTMLInputElement | null;
+  const preview = document.getElementById('badgePreview') as HTMLImageElement | null;
+  const warn = document.getElementById('badgeSizeWarning') as HTMLElement | null;
+
+  const typeEl = document.getElementById('badgeType') as HTMLSelectElement | null;
+  const compraFields = document.getElementById('compraFields');
+  const conquistaFields = document.getElementById('conquistaFields');
+
+  // Toggle campos por tipo
+  typeEl?.addEventListener('change', () => {
+    const tipo = (typeEl.value || 'COMPRA').toUpperCase();
+    if (compraFields && conquistaFields) {
+      const isCompra = tipo === 'COMPRA';
+      compraFields.style.display = isCompra ? '' : 'none';
+      conquistaFields.style.display = isCompra ? 'none' : '';
+    }
+  });
+
+  // Pré-visualização
+  imgInput?.addEventListener('change', () => {
+    const file = imgInput.files?.[0] || null;
+    if (!file || !preview) {
+      if (preview) preview.style.display = 'none';
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    preview.src = url;
+    preview.alt = 'Pré-visualização';
+    preview.style.cssText = 'max-width:160px;max-height:160px;border-radius:12px;display:block;border:1px solid #e9e9e9;padding:8px;';
+    warn && (warn.style.display = 'none');
+
+    const img = new Image();
+    img.onload = () => {
+      if ((img.width < 200 || img.height < 200) && warn) {
+        warn.textContent = 'Imagem pequena (recomendado mínimo 200×200).';
+        warn.style.display = 'block';
+      }
+    };
+    img.src = url;
+  });
+
+  // Submit do formulário (corrige o id do botão)
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const nameEl = document.getElementById('badgeName') as HTMLInputElement | null;
+    const descEl = document.getElementById('badgeDescription') as HTMLTextAreaElement | null;
+    const tipoEl = document.getElementById('badgeType') as HTMLSelectElement | null;
+
+    const nome = (nameEl?.value || '').trim();
+    const descricao = (descEl?.value || '').trim();
+    const tipo = (tipoEl?.value || 'COMPRA').toUpperCase() as 'COMPRA' | 'CONQUISTA';
+    const iconeFile = imgInput?.files?.[0] || null;
+
+    if (!nome) { showToast('Informe o nome da badge.', 'warning'); return; }
+    if (!descricao) { showToast('Informe a descrição.', 'warning'); return; }
+
+    // Campos por tipo
+    let custo_moedas: number | undefined;
+    let criterio_doacoes: number | undefined;
+    let criterio_moedas: number | undefined;
+
+    if (tipo === 'COMPRA') {
+      const custoEl = document.getElementById('badgeCost') as HTMLInputElement | null;
+      custo_moedas = Number(custoEl?.value ?? 0);
+      if (Number.isNaN(custo_moedas) || custo_moedas < 0) {
+        showToast('Custo inválido.', 'warning'); return;
+      }
+      // REMOVIDO: prompt feioso de confirmação
+    } else {
+      const doacoesEl = document.getElementById('criterioDoacoes') as HTMLInputElement | null;
+      const moedasEl = document.getElementById('criterioMoedas') as HTMLInputElement | null;
+      const doacoesVal = doacoesEl?.value?.trim() || '';
+      const moedasVal = moedasEl?.value?.trim() || '';
+
+      criterio_doacoes = doacoesVal ? Number(doacoesVal) : undefined;
+      criterio_moedas = moedasVal ? Number(moedasVal) : undefined;
+
+      if (doacoesVal && Number.isNaN(criterio_doacoes)) {
+        showToast('Critério de doações inválido.', 'warning'); return;
+      }
+      if (moedasVal && Number.isNaN(criterio_moedas)) {
+        showToast('Critério de moedas inválido.', 'warning'); return;
+      }
+      // REMOVIDO: prompt feioso de confirmação
+    }
+
+    try {
+      const created = await criarBadgeAdmin({
+        nome,
+        descricao,
+        tipo,
+        custo_moedas,
+        criterio_doacoes: criterio_doacoes ?? null,
+        criterio_moedas: criterio_moedas ?? null,
+        ativo: true,
+        icone: iconeFile || null,
+      });
+      showToast(`Badge criada: ${created.nome}`, 'success');
+      (window as any).bootstrap?.Modal.getOrCreateInstance(
+        document.getElementById('createBadgeModal')!
+      )?.hide();
+      setTimeout(() => location.reload(), 600);
+    } catch (err: any) {
+      const data = err?.response?.data || {};
+      const msg = data?.detail
+        || Object.keys(data).map(k => `${k}: ${Array.isArray(data[k]) ? data[k].join(', ') : data[k]}`).join(' | ')
+        || 'Erro ao criar badge.';
+      showToast(msg, 'danger', 6000);
+    }
+  });
+}
+
+// ============================================================================
+// ADMIN
+// ============================================================================
+
+async function setupAdminPage(): Promise<void> {
+  const panel = document.getElementById('adminPanel');
+  if (!panel) return;
+
+  panel.innerHTML = '<div class="text-muted">Carregando doações pendentes...</div>';
+
+  try {
+    const response = await listarDoacoesPendentes();
+    renderAdminPanel(panel, response.results);
+  } catch (error) {
+    panel.innerHTML = '<div class="text-danger">Erro ao carregar doações pendentes.</div>';
+    displayErrorToast(error, 'Erro ao carregar doações pendentes.');
+  }
+}
+
+function renderAdminPanel(container: HTMLElement, doacoes: Doacao[]): void {
   container.innerHTML = '';
 
   const card = document.createElement('div');
   card.className = 'card shadow-sm';
-  const body = document.createElement('div');
-  body.className = 'card-body p-3';
-
-  const controls = document.createElement('div');
-  controls.className = 'mb-3';
-  controls.innerHTML = `
-    <div class="d-flex align-items-center gap-3 w-100">
-      <div class="form-check form-switch d-flex align-items-center">
-        <input class="form-check-input" type="checkbox" id="selectAllAdmin">
-        <label class="form-check-label small text-muted ms-2 mb-0" for="selectAllAdmin">Selecionar todos</label>
-      </div>
-      <div class="d-flex gap-2 justify-content-center w-100 mx-auto" style="max-width:720px;">
-        <button class="btn btn-success btn-sm px-3" id="approveSelected">Aprovar selecionados</button>
-        <button class="btn btn-danger btn-sm px-3" id="rejectSelected">Rejeitar selecionados</button>
+  card.innerHTML = `
+    <div class="card-body">
+      <h5 class="card-title mb-3">Doações Pendentes (${doacoes.length})</h5>
+      <div class="table-responsive">
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Doador</th>
+              <th>Tipo</th>
+              <th>Data</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="adminTableBody"></tbody>
+        </table>
       </div>
     </div>
   `;
 
-  body.appendChild(controls);
+  const tbody = card.querySelector('#adminTableBody')!;
 
-  const tableWrap = document.createElement('div');
-  tableWrap.className = 'table-responsive';
-
-  const table = document.createElement('table');
-  table.className = 'table table-hover mb-0';
-  table.innerHTML = `
-    <thead>
-      <tr>
-        <th style="width:40px"></th>
-        <th>Tipo</th>
-        <th>Descrição</th>
-        <th>Data</th>
-        <th>Status</th>
-        <th style="width:220px">Ações</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  `;
-
-  const tbody = table.querySelector('tbody') as HTMLTableSectionElement;
-  if (!submissions || submissions.length === 0) {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td colspan="6" class="text-muted small">Nenhuma doação pendente.</td>`;
-    tbody.appendChild(tr);
+  if (doacoes.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Nenhuma doação pendente</td></tr>';
   } else {
-      for (const s of submissions) {
+    doacoes.forEach(doacao => {
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td><input type="checkbox" class="admin-select" data-id="${s.id}"></td>
-        <td>${escapeHtml(s.tipo)}</td>
-        <td class="small text-muted">${escapeHtml(s.descricao)}</td>
-        <td class="small">${new Date(s.data).toLocaleString()}</td>
-        <td><span class="badge bg-warning text-dark">${escapeHtml(s.status)}</span></td>
+        <td>${doacao.id}</td>
+        <td>${escapeHtml(doacao.doador)}</td>
+        <td>${escapeHtml(doacao.tipo_doacao)}</td>
+        <td class="small">${formatarDataDoacao(doacao.data_submissao)}</td>
         <td>
-          <button class="btn btn-sm btn-success me-1 admin-approve" data-id="${s.id}">Aprovar</button>
-          <button class="btn btn-sm btn-danger admin-reject" data-id="${s.id}">Rejeitar</button>
+          <button class="btn btn-sm btn-success me-1 aprovar-btn" data-id="${doacao.id}">
+            Aprovar
+          </button>
+          <button class="btn btn-sm btn-danger recusar-btn" data-id="${doacao.id}">
+            Recusar
+          </button>
         </td>
       `;
       tbody.appendChild(tr);
-    }
-  }
-
-  tableWrap.appendChild(table);
-  body.appendChild(tableWrap);
-  card.appendChild(body);
-  container.appendChild(card);
-
-  renderTypesManagement(container);
-
-  const selectAll = container.querySelector('#selectAllAdmin');
-  selectAll?.addEventListener('change', (e) => {
-    const checked = (e.target as HTMLInputElement).checked;
-    for (const cb of container.querySelectorAll<HTMLInputElement>('.admin-select')) {
-      cb.checked = checked;
-    }
-  });
-
-  for (const btn of container.querySelectorAll('.admin-approve')) {
-    btn.addEventListener('click', () => {
-      const id = Number((btn as HTMLElement).dataset.id);
-      updateSubmissionStatus(id, 'Aprovado');
-      setupAdminPage();
-      setupHistoricoPage();
     });
-  }
 
-  for (const btn of container.querySelectorAll('.admin-reject')) {
-    btn.addEventListener('click', () => {
-      const id = Number((btn as HTMLElement).dataset.id);
-      updateSubmissionStatus(id, 'Rejeitado');
-      setupAdminPage();
-      setupHistoricoPage();
-    });
-  }
-
-  const approveSelected = container.querySelector('#approveSelected');
-  const rejectSelected = container.querySelector('#rejectSelected');
-  
-  approveSelected?.addEventListener('click', () => {
-    const ids = Array.from(container.querySelectorAll<HTMLInputElement>('.admin-select:checked')).map(cb =>
-      Number(cb.dataset.id)
-    );
-    for (const id of ids) {
-      updateSubmissionStatus(id, 'Aprovado');
-    }
-    setupAdminPage();
-    setupHistoricoPage();
-  });
-  
-  rejectSelected?.addEventListener('click', () => {
-    const ids = Array.from(container.querySelectorAll<HTMLInputElement>('.admin-select:checked')).map(cb =>
-      Number(cb.dataset.id)
-    );
-    for (const id of ids) {
-      updateSubmissionStatus(id, 'Rejeitado');
-    }
-    setupAdminPage();
-    setupHistoricoPage();
-  });
-}
-
-function renderTypesManagement(container: HTMLElement) {
-  const card = document.createElement('div');
-  card.className = 'card mt-3';
-  const body = document.createElement('div');
-  body.className = 'card-body p-3';
-  body.innerHTML = `
-    <h5>Gerenciar Tipos de Doação</h5>
-    <div class="admin-add-row mb-2">
-      <div>
-        <input id="novoTipoInput" class="form-control form-control-sm" placeholder="Novo tipo (ex: Materiais escolares)" />
-      </div>
-      <div style="display:flex;justify-content:center;">
-        <button id="addTipoBtn" class="btn btn-primary btn-sm admin-btn-fixed">Adicionar</button>
-      </div>
-    </div>
-    <ul id="tiposList" class="list-group list-group-flush"></ul>
-  `;
-  card.appendChild(body);
-  container.appendChild(card);
-
-  const tiposList = body.querySelector('#tiposList') as HTMLUListElement;
-  const novoInput = body.querySelector('#novoTipoInput') as HTMLInputElement;
-  const addBtn = body.querySelector('#addTipoBtn') as HTMLButtonElement;
-
-  function refreshList() {
-    tiposList.innerHTML = '';
-    const types = getDonationTypes();
-    if (!types.length) {
-      const li = document.createElement('li');
-      li.className = 'list-group-item text-muted small';
-      li.textContent = 'Nenhum tipo configurado.';
-      tiposList.appendChild(li);
-      return;
-    }
-    for (const t of types) {
-      const li = document.createElement('li');
-      li.className = 'list-group-item d-flex align-items-center justify-content-between';
-      li.innerHTML = `
-        <div class="tipo-label small text-truncate" style="max-width:70%;">${escapeHtml(t.name)}</div>
-        <div class="btns">
-          <button class="btn btn-sm btn-outline-secondary admin-btn-fixed me-1 tipo-edit" data-id="${t.id}">Editar</button>
-          <button class="btn btn-sm btn-outline-danger admin-btn-fixed tipo-delete" data-id="${t.id}">Excluir</button>
-        </div>
-      `;
-      tiposList.appendChild(li);
-    }
-    
-    attachTypeEventListeners(tiposList, refreshList);
-  }
-
-  function attachTypeEventListeners(tiposList: HTMLUListElement, refreshFn: () => void) {
-    for (const b of tiposList.querySelectorAll('.tipo-delete')) {
-      b.addEventListener('click', () => {
-        const id = Number((b as HTMLElement).dataset.id);
-        const types = getDonationTypes().filter((x: any) => x.id !== id);
-        saveDonationTypes(types);
-        refreshFn();
-        populateDonationTypes();
-        showToast('Tipo excluído', 'warning');
+    // Event listeners
+    tbody.querySelectorAll('.aprovar-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const id = Number((e.target as HTMLElement).dataset.id);
+        handleValidarDoacao(id, 'APROVADA');
       });
-    }
-    
-    for (const b of tiposList.querySelectorAll('.tipo-edit')) {
-      b.addEventListener('click', () => {
-        handleEditTipo(b as HTMLElement, refreshFn);
+    });
+
+    tbody.querySelectorAll('.recusar-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const id = Number((e.target as HTMLElement).dataset.id);
+        handleValidarDoacao(id, 'RECUSADA');
       });
-    }
-  }
-
-  function handleEditTipo(btn: HTMLElement, refreshFn: () => void) {
-    const id = Number(btn.dataset.id);
-    const li = btn.closest('li') as HTMLLIElement;
-    const label = li.querySelector('.tipo-label') as HTMLElement;
-    const current = label.textContent || '';
-    const btnsDiv = li.querySelector('.btns') as HTMLElement;
-    if (btnsDiv) btnsDiv.style.display = 'none';
-    
-    const input = document.createElement('input');
-    input.className = 'form-control form-control-sm me-2';
-    input.value = current;
-    const saveBtn = document.createElement('button');
-    saveBtn.className = 'btn btn-sm btn-primary me-1';
-    saveBtn.textContent = 'Salvar';
-    const cancelBtn = document.createElement('button');
-    cancelBtn.className = 'btn btn-sm btn-secondary';
-    cancelBtn.textContent = 'Cancelar';
-    const holder = document.createElement('div');
-    holder.className = 'd-flex w-100 align-items-center';
-    holder.appendChild(input);
-    holder.appendChild(saveBtn);
-    holder.appendChild(cancelBtn);
-    label.replaceWith(holder);
-
-    cancelBtn.addEventListener('click', () => refreshFn());
-    saveBtn.addEventListener('click', () => {
-      const v = input.value.trim();
-      if (!v) {
-        showToast('Nome inválido', 'danger');
-        return;
-      }
-      const types = getDonationTypes().map((x: any) => (x.id === id ? { id: x.id, name: v } : x));
-      saveDonationTypes(types);
-      refreshFn();
-      populateDonationTypes();
-      showToast('Tipo atualizado', 'success');
     });
   }
 
-  addBtn.addEventListener('click', () => {
-    const v = (novoInput.value || '').trim();
-    if (!v) {
-      showToast('Digite o nome do tipo', 'warning');
+  container.appendChild(card);
+}
+
+async function handleValidarDoacao(id: number, status: 'APROVADA' | 'RECUSADA'): Promise<void> {
+  let motivo_recusa: string | undefined;
+
+  if (status === 'RECUSADA') {
+    const motivo = await confirmWithInput({
+      title: 'Recusar doação',
+      message: 'Informe o motivo da recusa. Esta ação é definitiva.',
+      label: 'Motivo da recusa',
+      placeholder: 'Ex: Foto ilegível, item não corresponde...',
+      confirmText: 'Recusar',
+      cancelText: 'Cancelar',
+      variant: 'danger',
+      required: true,
+      minLength: 5
+    });
+    if (!motivo) {
+      showToast('Recusa cancelada.', 'info');
       return;
     }
-    const types = getDonationTypes();
-    if (types.some((t: any) => t.name.toLowerCase() === v.toLowerCase())) {
-      showToast('Tipo já existe', 'warning');
+    motivo_recusa = motivo;
+  } else {
+    const ok = await confirmAction({
+      title: 'Aprovar doação?',
+      message: 'Confirma aprovação desta doação?',
+      confirmText: 'Aprovar',
+      cancelText: 'Cancelar',
+      variant: 'success'
+    });
+    if (!ok) {
+      showToast('Aprovação cancelada.', 'info');
       return;
     }
-    types.push({ id: Date.now(), name: v });
-    saveDonationTypes(types);
-    novoInput.value = '';
-    refreshList();
-    populateDonationTypes();
-    showToast('Tipo adicionado', 'success');
+  }
+
+  try {
+    const resultado = await validarDoacao(id, { status, motivo_recusa });
+    showToast(resultado.mensagem, status === 'APROVADA' ? 'success' : 'warning');
+    if (status === 'APROVADA' && 'saldo_restante' in resultado && typeof (resultado as any).saldo_restante === 'number') {
+      setBalance((resultado as any).saldo_restante);
+    }
+    if (resultado.badges_conquistadas?.length) {
+      showToast(`Badges: ${resultado.badges_conquistadas.join(', ')}`, 'success', 5000);
+    }
+    await setupAdminPage();
+  } catch (error) {
+    displayErrorToast(error, 'Erro ao carregar validação de doação.');
+  }
+}
+
+// ============================================================================
+// UTILIDADES
+// ============================================================================
+
+function syncBalance(): void {
+  updateBalanceUI(getBalance());
+}
+
+function updateBalanceUI(balance: number): void {
+  document.querySelectorAll('[data-balance]').forEach(el => {
+    el.textContent = String(balance);
   });
-
-  refreshList();
+  const userBalance = document.getElementById('userBalance');
+  if (userBalance) {
+    userBalance.innerHTML = `<span data-balance>${balance}</span> Moedas`;
+  }
 }
 
-// ============ SERVIÇOS COMPARTILHADOS ============
-function showToast(message: string, variant: 'success' | 'danger' | 'warning' = 'success', timeout = 3000) {
-  const container = ensureToastContainer();
-
-  const toast = document.createElement('div');
-  toast.className = 'toast';
-  toast.setAttribute('role', 'status');
-  toast.setAttribute('aria-live', 'polite');
-  toast.setAttribute('aria-atomic', 'true');
-
-  toast.innerHTML = `
-    <div class="toast-header bg-${variant} text-white">
-      <strong class="me-auto">Eco Doação</strong>
-      <button type="button" class="btn-close btn-close-white ms-2 mb-1" data-bs-dismiss="toast" aria-label="Close"></button>
-    </div>
-    <div class="toast-body">
-      ${escapeHtml(message)}
-    </div>
-  `;
-
-  container.appendChild(toast);
-
-  try {
-    const ToastCtor = (globalThis as any).bootstrap?.Toast;
-    if (ToastCtor) {
-      const bsToast = new ToastCtor(toast, { delay: timeout });
-      bsToast.show();
-      toast.addEventListener('hidden.bs.toast', () => toast.remove());
-      return;
+function updateBadgesUI(ownedIds: number[]): void {
+  document.querySelectorAll('[data-badge-id]').forEach(el => {
+    const badgeId = Number((el as HTMLElement).dataset.badgeId);
+    if (ownedIds.includes(badgeId)) {
+      el.classList.add('owned');
+    } else {
+      el.classList.remove('owned');
     }
-  } catch {
-    // fallthrough to simple show
-  }
-
-  toast.classList.add('show');
-  setTimeout(() => {
-    toast.classList.remove('show');
-    toast.remove();
-  }, timeout + 500);
+  });
 }
 
-function ensureToastContainer() {
-  let container = document.getElementById('toast-container');
-  if (!container) {
-    container = document.createElement('div');
-    container.id = 'toast-container';
-    container.className = 'position-fixed top-0 end-0 p-3';
-    (container.style as any).zIndex = '1080';
-    document.body.appendChild(container);
-  }
-  return container;
-}
-
-// Tornar showToast disponível globalmente para scripts simples no HTML
-try {
-  (globalThis as any).showToast = showToast;
-} catch (_) {
-  // ignore
-}
-
-function escapeHtml(s: string) {
-  const div = document.createElement('div');
-  div.textContent = s;
-  return div.innerHTML;
-}
-
-function getSubmissions() {
-  const raw = localStorage.getItem('ecodoacao_submissions');
-  if (!raw) return [];
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return [];
-  }
-}
-
-function saveSubmission(sub: any) {
-  const arr = getSubmissions();
-  arr.unshift(sub);
-  localStorage.setItem('ecodoacao_submissions', JSON.stringify(arr));
-}
-
-function updateSubmissionStatus(id: number, newStatus: string) {
-  const arr = getSubmissions();
-  const idx = arr.findIndex((s: any) => s.id === id);
-  if (idx === -1) return;
-  arr[idx].status = newStatus;
-  localStorage.setItem('ecodoacao_submissions', JSON.stringify(arr));
-  showToast(
-    `Doação ${id} marcada como ${newStatus}`,
-    newStatus === 'Aprovado' ? 'success' : 'danger'
-  );
-  // Create a user notification when a submission is approved
-  if (newStatus === 'Aprovado') {
-    const s = arr[idx];
-    const title = 'Doação aprovada';
-    const message = s && s.tipo ? `Sua doação (${s.tipo}) foi aprovada.` : `Sua doação foi aprovada.`;
-    try { addNotification(title, message, '/src/pages/historico.html'); } catch (e) { /* ignore */ }
-  }
-}
-
-function getDonationTypes() {
-  const raw = localStorage.getItem('ecodoacao_types');
-  if (!raw) return ensureDefaultDonationTypes();
-  try {
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed) || parsed.length === 0) return ensureDefaultDonationTypes();
-    return parsed;
-  } catch {
-    return ensureDefaultDonationTypes();
-  }
-}
-
-function saveDonationTypes(types: any[]) {
-  localStorage.setItem('ecodoacao_types', JSON.stringify(types));
-}
-
-function ensureDefaultDonationTypes() {
-  const defaults = [
-    { id: 1, name: 'Reuso de Livros' },
-    { id: 2, name: 'Descarte Eletrônico' },
-    { id: 3, name: 'Doação de Roupas' },
-    { id: 4, name: 'Doação de Alimentos' },
-  ];
-  saveDonationTypes(defaults);
-  return defaults;
-}
-
+// Exportar showToast globalmente (para uso em outros scripts)
+(window as any).showToast = showToast;

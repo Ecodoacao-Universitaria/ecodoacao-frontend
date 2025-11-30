@@ -5,101 +5,76 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Painel do Usuário - Eco Doação</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="src/assets/styles/style.css">
+    <link rel="stylesheet" href="/src/assets/styles/style.css">
   </head>
   <body>
-    <div class="login-container container py-5">
-      <div class="logo-area text-center mb-4">
-        <img src="/src/assets/img/logo-eco-doacao.png" alt="Logo Capivara e Jacaré" style="max-width:140px;">
-        <h1 class="h4 mt-2">Painel do Usuário</h1>
-      </div>
-
-      <div class="row gy-3">
-        <div class="col-12 col-md-4">
-          <div class="card text-center shadow-sm p-3">
-            <h5>Saldo Atual</h5>
-            <div class="fs-4 mt-2" id="userBalance">💰 <span id="balanceAmount">250</span> Moedas</div>
-            <p class="text-muted small">Continue ajudando e acumule mais recompensas!</p>
+    <!-- Container principal centralizado -->
+    <div class="container py-4">
+      <div class="row justify-content-center">
+        <div class="col-12 col-lg-10">
+          
+          <!-- Header do Dashboard -->
+          <div class="login-container text-center mb-4">
+            <div class="logo-area">
+              <img src="/src/assets/img/logo-eco-doacao.png" alt="Logo Eco Doação">
+              <h1>Painel do Usuário</h1>
+            </div>
           </div>
-        </div>
-        <div class="col-12 col-md-8">
-          <div class="card shadow-sm p-3">
-            <h5>Suas Conquistas</h5>
-            <div class="d-flex gap-3 flex-wrap mt-3">
-              <div class="text-center" data-badge-id="1">
-                <img src="/src/assets/img/badge1.svg" alt="Primeira Doação" style="width:64px;height:64px;">
-                <div class="small">Primeira Doação</div>
+
+          <!-- Grid principal do dashboard -->
+          <div class="row g-4 mb-4">
+            <!-- Card do Saldo -->
+            <div class="col-12 col-md-6">
+              <div class="saldo-card">
+                <h2>💰 Saldo Atual</h2>
+                <div class="saldo-valor" id="userBalance">
+                  <span id="balanceAmount">0</span> Moedas
+                </div>
+                <p style="color: #388e3c; margin: 0;">Continue ajudando e acumule mais recompensas!</p>
               </div>
-              <div class="text-center" data-badge-id="2">
-                <img src="/src/assets/img/badge2.svg" alt="Herói Verde" style="width:64px;height:64px;">
-                <div class="small">Herói Verde</div>
-              </div>
-              <div class="text-center" data-badge-id="3">
-                <img src="/src/assets/img/badge3.svg" alt="Reciclador Ouro" style="width:64px;height:64px;">
-                <div class="small">Reciclador Ouro</div>
-              </div>
-              <div class="text-center" data-badge-id="4">
-                <img src="/src/assets/img/badge4.svg" alt="Reciclagem Exemplar" style="width:64px;height:64px;">
-                <div class="small">Reciclagem Exemplar</div>
-              </div>
-              <div class="text-center" data-badge-id="5">
-                <img src="/src/assets/img/badge5.svg" alt="Estrela de Mérito" style="width:64px;height:64px;">
-                <div class="small">Estrela de Mérito</div>
-              </div>
-              <div class="text-center" data-badge-id="6">
-                <img src="/src/assets/img/badge6.svg" alt="Desafio Cumprido" style="width:64px;height:64px;">
-                <div class="small">Desafio Cumprido</div>
+            </div>
+
+            <!-- Estatísticas e badges injetados -->
+            <div class="col-12 col-md-6">
+              <div class="saldo-card">
+                <h2>📊 Suas Estatísticas</h2>
+                <div id="dashboardContent"></div>
               </div>
             </div>
           </div>
-        </div>
 
-        <div class="col-12">
-          <div class="d-flex gap-2">
-            <a class="btn btn-success" href="submissao.html">Nova Doação</a>
-            <a class="btn btn-outline-secondary" href="historico.html">Histórico de Doações</a>
-            <a class="btn btn-outline-secondary" href="galeria.html">Galeria de Badges</a>
+          <!-- Card das Conquistas (removido estático, será renderizado via app.ts) -->
+
+          <!-- Botões de Ação -->
+          <div class="row g-4">
+            <div class="col-12">
+              <div class="login-container">
+                <div class="d-grid gap-3">
+                  <a class="btn btn-success btn-lg" href="submissao.html">
+                    🌱 Nova Doação
+                  </a>
+                  <div class="row g-2">
+                    <div class="col-12 col-md-6">
+                      <a class="btn btn-outline-success w-100" href="historico.html">
+                        📋 Histórico
+                      </a>
+                    </div>
+                    <div class="col-12 col-md-6">
+                      <a class="btn btn-outline-success w-100" href="galeria.html">
+                        🏅 Galeria de Badges
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
+
         </div>
       </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-      // Marcar badges adquiridas (leitura de localStorage)
-      (function(){
-        function markOwned() {
-          try {
-            const raw = localStorage.getItem('ecodoacao_owned_badges');
-            if (!raw) return;
-            const owned = JSON.parse(raw);
-            for (const id of owned) {
-              const el = document.querySelector(`.text-center[data-badge-id="${id}"]`);
-              if (!el) continue;
-                // Marcar badges adquiridas (visual + overlay)
-                const owned = JSON.parse(localStorage.getItem('ecodoacao_owned_badges') || '[]');
-                owned.forEach(id => {
-                  const el = document.querySelector(`[data-badge-id="${id}"]`);
-                  if (el) {
-                    el.classList.add('owned');
-                    // criar overlay se não existir
-                    if (!el.querySelector('.owned-overlay')) {
-                      const overlay = document.createElement('div');
-                      overlay.className = 'owned-overlay';
-                      overlay.innerHTML = '<span class="dot"></span><span style="margin-left:6px">Conquistada</span>';
-                      el.appendChild(overlay);
-                    }
-                  }
-                });
-            }
-          } catch (e) {
-            // ignore
-          }
-        }
-        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', markOwned);
-        else markOwned();
-      })();
-    </script>
     <script type="module" src="/src/core/app.ts"></script>
   </body>
 </html>
