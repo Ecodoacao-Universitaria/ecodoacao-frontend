@@ -132,6 +132,7 @@ export interface Badge {
   nome: string;
   descricao: string;
   icone: string | null;
+  icone_url?: string | null;
   tipo: BadgeTipo;
   tipo_display: string;
   custo_moedas: number;
@@ -140,7 +141,6 @@ export interface Badge {
   ativo: boolean;
   criado_em: string;
 }
-
 export interface UsuarioBadge {
   id: number;
   badge: Badge;

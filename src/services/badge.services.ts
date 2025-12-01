@@ -44,7 +44,10 @@ export async function criarBadgeAdmin(data: {
   if (data.criterio_doacoes != null) fd.append('criterio_doacoes', String(data.criterio_doacoes));
   if (data.criterio_moedas != null) fd.append('criterio_moedas', String(data.criterio_moedas));
   fd.append('ativo', String(data.ativo));
-  if (data.icone) fd.append('icone', data.icone);
+  
+  if (data.icone instanceof File) {
+    fd.append('icone', data.icone, data.icone.name);
+  }
 
   return apiRequest(API_ENDPOINTS.badges.criar, {
     method: 'POST',
@@ -73,11 +76,12 @@ export async function atualizarBadgeAdmin(id: number, data: {
     if (data.criterio_doacoes != null) fd.append('criterio_doacoes', String(data.criterio_doacoes));
     if (data.criterio_moedas != null) fd.append('criterio_moedas', String(data.criterio_moedas));
     if (typeof data.ativo === 'boolean') fd.append('ativo', String(data.ativo));
-    fd.append('icone', data.icone);
+    fd.append('icone', data.icone, data.icone.name);
+    
     return apiRequest(API_ENDPOINTS.badges.atualizar(id), {
       method: 'PATCH',
       body: fd,
-      headers: multipartHeaders(),
+      headers: multipartHeaders(), 
       absolute: true
     });
   }
@@ -88,6 +92,7 @@ export async function atualizarBadgeAdmin(id: number, data: {
     absolute: true
   });
 }
+
 
 export async function excluirBadgeAdmin(id: number) {
   return apiRequest(API_ENDPOINTS.badges.excluir(id), {

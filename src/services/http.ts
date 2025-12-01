@@ -74,7 +74,7 @@ interface RequestOptions<TBody> {
   headers?: Record<string,string>;
   timeoutMs?: number;
   credentials?: RequestCredentials;
-  absolute?: boolean; // se true, não prefixa API_BASE
+  absolute?: boolean;
 }
 
 export async function apiRequest<TResp = any, TBody = any>(
@@ -103,13 +103,14 @@ export async function apiRequest<TResp = any, TBody = any>(
 
   let fetchBody: any;
   if (body instanceof FormData) {
-    fetchBody = body; // não definir Content-Type
+    delete finalHeaders['Content-Type'];
+    fetchBody = body;
   } else if (body && typeof body === 'object') {
     if (!finalHeaders['Content-Type']) finalHeaders['Content-Type'] = 'application/json';
     fetchBody = JSON.stringify(body);
   }
 
- const fullUrl = absolute
+  const fullUrl = absolute
     ? url
     : `${API_ROOT.replace(/\/+$/, '')}/${url.replace(/^\/+/, '')}`;
 
@@ -135,7 +136,6 @@ export async function apiRequest<TResp = any, TBody = any>(
   if (!resp.ok) {
     if (resp.status === 401) {
       clearTokens();
-      // opcional: redirect para login
     }
     const detail = json?.detail || json?.erro || resp.statusText || 'Erro na requisição';
     const error: any = new Error(detail);

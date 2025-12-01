@@ -18,15 +18,13 @@ let isProcessingDelete = false;
 
 function resolveMediaUrl(src: string | null | undefined): string {
   if (!src) return '';
-  if (/^https?:\/\//i.test(src)) return src;
-  try {
-    const base = String(API_BASE_URL || '').replace(/\/+$/, '/') || '/';
-    return new URL(String(src).replace(/^\/+/, ''), base).toString();
-  } catch {
-    return String(src || '');
+  
+  if (typeof src === 'string' && (src.startsWith('http://') || src.startsWith('https://'))) {
+    return src;
   }
+  
+  return '';
 }
-
 export async function initGaleria(): Promise<void> {
   await loadDisponiveis();
   renderDisponiveis();
@@ -67,9 +65,9 @@ function renderDisponiveis(): void {
     card.className = 'text-center badge-card';
     card.dataset.badgeId = String(badge.id);
 
-    const iconUrl = resolveMediaUrl(badge.icone || '');
+    const iconUrl = badge.icone_url || '';
     const iconHtml = iconUrl
-      ? `<img src="${escapeHtml(iconUrl)}" alt="${escapeHtml(badge.nome)}" class="img-fluid rounded border" style="max-height:96px;max-width:96px;">`
+      ? `<img src="${escapeHtml(iconUrl)}" alt="${escapeHtml(badge.nome)}" class="img-fluid rounded border" style="max-height:96px;max-width:96px;object-fit:cover;">`
       : `<div class="badge-icon mb-2" style="font-size:64px;">💎</div>`;
 
     card.innerHTML = `
@@ -216,7 +214,15 @@ function openEditBadgeModal(badge: any): void {
   if (costEl) costEl.value = String(badge.custo_moedas ?? 0);
   if (doacoesEl) doacoesEl.value = badge.criterio_doacoes != null ? String(badge.criterio_doacoes) : '';
   if (moedasEl) moedasEl.value = badge.criterio_moedas != null ? String(badge.criterio_moedas) : '';
-  if (imgPreview) imgPreview.src = resolveMediaUrl(badge.icone || '');
+  
+  if (imgPreview) {
+    if (badge.icone_url) {
+      imgPreview.src = badge.icone_url;
+      imgPreview.style.display = 'block';
+    } else {
+      imgPreview.style.display = 'none';
+    }
+  }
 
   const deleteBox = document.getElementById('deleteConfirmBox') as HTMLElement | null;
   deleteBox?.classList.add('d-none');

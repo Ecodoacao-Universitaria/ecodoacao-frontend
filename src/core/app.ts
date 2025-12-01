@@ -288,14 +288,14 @@ function renderDashboardBadges(container: HTMLElement, badges: any[]): void {
 
   badges.slice(0, 6).forEach((raw: any) => {
     const b = raw?.badge ? raw.badge : raw; 
-    const icone = b?.icone || '🏆';
+    const iconeHtml = renderBadgeIcone(b);
     const nome = b?.nome || 'Badge';
     const desc = b?.descricao || '';
     grid.innerHTML += `
       <div class="col-md-4">
         <div class="card">
           <div class="card-body text-center">
-            <div class="mb-2">${icone}</div>
+            <div class="mb-2">${iconeHtml}</div>  
             <h6>${escapeHtml(nome)}</h6>
             <p class="small text-muted mb-0">${escapeHtml(desc)}</p>
           </div>
@@ -562,11 +562,12 @@ function renderMinhasBadges(container: HTMLElement, badges: UsuarioBadge[]): voi
     grid.innerHTML = '<div class="col-12"><p class="text-muted">Você ainda não conquistou nenhuma badge.</p></div>';
   } else {
     badges.forEach(ub => {
+      const iconeHtml = renderBadgeIcone(ub.badge);
       grid.innerHTML += `
         <div class="col-md-4">
           <div class="card badge-card owned">
             <div class="card-body text-center">
-              <div class="badge-icon mb-2">${ub.badge.icone || '🏆'}</div>
+              <div class="badge-icon mb-2">${iconeHtml}</div>  
               <h6>${escapeHtml(ub.badge.nome)}</h6>
               <p class="small text-muted">${escapeHtml(ub.badge.descricao)}</p>
               <p class="small text-success mb-0">Conquistada em: ${formatarDataConquista(ub.data_conquista)}</p>
@@ -592,12 +593,13 @@ function renderBadgesDisponiveis(container: HTMLElement, badges: Badge[]): void 
   if (badges.length === 0) {
     grid.innerHTML = '<div class="col-12"><p class="text-muted">Você já possui todas as badges disponíveis!</p></div>';
   } else {
-    badges.forEach(badge => {
+   badges.forEach(badge => {
+      const iconeHtml = renderBadgeIcone(badge);
       grid.innerHTML += `
         <div class="col-md-4">
           <div class="card badge-card">
             <div class="card-body text-center">
-              <div class="badge-icon mb-2">${badge.icone || '💎'}</div>
+              <div class="badge-icon mb-2">${iconeHtml}</div>  
               <h6>${escapeHtml(badge.nome)}</h6>
               <p class="small text-muted">${escapeHtml(badge.descricao)}</p>
               <p class="fw-bold text-primary">${badge.custo_moedas} moedas</p>
@@ -615,37 +617,10 @@ function renderBadgesDisponiveis(container: HTMLElement, badges: Badge[]): void 
       const btn = (e.target as HTMLElement).closest('.comprar-badge') as HTMLButtonElement | null;
       if (!btn) return;
       const badgeId = Number(btn.dataset.badgeId);
-      const custo = Number(btn.dataset.custo);
-      handleComprarBadge(badgeId, custo);
+      comprarBadge(badgeId);
     });
   }
   container.appendChild(section);
-}
-
-async function handleComprarBadge(badgeId: number, custo: number): Promise<void> {
-  const ok = await confirmAction({
-    title: 'Comprar badge?',
-    message: `Confirma a compra por ${custo} moedas?`,
-    confirmText: 'Comprar',
-    cancelText: 'Cancelar',
-    variant: 'primary'
-  });
-  if (!ok) return;
-
-  try {
-    const resultado = await comprarBadge(badgeId);
-    if (resultado.sucesso) {
-      showToast(resultado.mensagem, 'success');
-      if (typeof resultado.saldo_restante === 'number') {
-        setBalance(resultado.saldo_restante);
-      }
-      setTimeout(() => location.reload(), 800);
-    } else {
-      showToast(resultado.mensagem || 'Falha na compra.', 'warning');
-    }
-  } catch (error: any) {
-    displayErrorToast(error, 'Erro ao comprar badge.');
-  }
 }
 
 // ===== CRIAÇÃO DE BADGE (ADMIN) =====
@@ -918,15 +893,18 @@ function updateBalanceUI(balance: number): void {
   }
 }
 
-function updateBadgesUI(ownedIds: number[]): void {
-  document.querySelectorAll('[data-badge-id]').forEach(el => {
-    const badgeId = Number((el as HTMLElement).dataset.badgeId);
-    if (ownedIds.includes(badgeId)) {
-      el.classList.add('owned');
-    } else {
-      el.classList.remove('owned');
-    }
-  });
+function renderBadgeIcone(badge: any): string {
+  const url = badge?.icone_url;
+  
+  if (!url) {
+    return '<span class="badge-icon-emoji" style="font-size:48px;">🏆</span>';
+  }
+  
+  if (typeof url === 'string' && (url.startsWith('http://') || url.startsWith('https://'))) {
+    return `<img src="${escapeHtml(url)}" alt="Badge" class="badge-icon-img" style="width: 64px; height: 64px; object-fit: cover; border-radius: 8px;" />`;
+  }
+  
+  return '<span class="badge-icon-emoji" style="font-size:48px;">🏆</span>';
 }
 
 // Exportar showToast globalmente (para uso em outros scripts)
