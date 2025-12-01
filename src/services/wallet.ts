@@ -13,12 +13,19 @@ export function setBalance(v: number): void {
 
 export function updateBalanceUI(v?: number): void {
   const val = typeof v === 'number' ? v : balance;
+  const safeVal = Number(val) || 0;
   document.querySelectorAll('[data-balance]').forEach(el => {
-    el.textContent = String(val);
+    el.textContent = String(safeVal);
   });
   const userBalance = document.getElementById('userBalance');
   if (userBalance) {
-    userBalance.innerHTML = `<span data-balance>${val}</span> Moedas`;
+    // Check if we need to rebuild the structure
+    const existingSpan = userBalance.querySelector('[data-balance]') as HTMLElement | null;
+    if (existingSpan) {
+      existingSpan.textContent = String(safeVal);
+    } else {
+      userBalance.textContent = `${safeVal} Moedas`;
+    }
   }
 }
 
