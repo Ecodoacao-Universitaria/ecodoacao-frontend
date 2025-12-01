@@ -45,7 +45,7 @@ export function tokenExpiresInMs(): number | null {
 let refreshing: Promise<string> | null = null;
 async function ensureFreshToken(): Promise<void> {
   const ms = tokenExpiresInMs();
-  if (ms !== null && ms < 60_000) {
+  if (ms !== null && ms < 300_000) {
     if (!refreshing) {
       const r = getRefreshToken();
       if (!r) return;
@@ -135,7 +135,38 @@ export async function apiRequest<TResp = any, TBody = any>(
 
   if (!resp.ok) {
     if (resp.status === 401) {
-      clearTokens();
+      try {
+        await ensureFreshToken();
+        const newAccess = getAccessToken();
+        if (newAccess) {
+          finalHeaders['Authorization'] = `Bearer ${newAccess}`;
+          const retryResp = await fetch(fullUrl, {
+            method,
+            headers: finalHeaders,
+            body: fetchBody,
+            signal: ctrl.signal,
+            credentials
+          });
+          const retryTxt = await retryResp.text();
+          let retryJson: any;
+          try { retryJson = retryTxt ? JSON.parse(retryTxt) : null; } catch { retryJson = retryTxt; }
+          if (retryResp.ok) {
+            return retryJson as TResp;
+          }
+          if (retryResp.status === 401) {
+            clearTokens();
+          }
+          const retryDetail = retryJson?.detail || retryJson?.erro || retryResp.statusText || 'Erro na requisição';
+          const retryError: any = new Error(retryDetail);
+          retryError.status = retryResp.status;
+          retryError.payload = retryJson;
+          throw retryError;
+        } else {
+          clearTokens();
+        }
+      } catch {
+        clearTokens();
+      }
     }
     const detail = json?.detail || json?.erro || resp.statusText || 'Erro na requisição';
     const error: any = new Error(detail);

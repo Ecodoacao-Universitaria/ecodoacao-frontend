@@ -85,9 +85,10 @@ export async function atualizarBadgeAdmin(id: number, data: {
       absolute: true
     });
   }
+  const { icone, ...jsonData } = data;
   return apiRequest(API_ENDPOINTS.badges.atualizar(id), {
     method: 'PATCH',
-    body: data,
+    body: jsonData,
     headers: authHeaders(),
     absolute: true
   });

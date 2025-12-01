@@ -1,4 +1,7 @@
 // Serviço de carteira/loja (saldo do usuário e badges adquiridas)
+import { apiRequest } from './http';
+import { API_ENDPOINTS } from '../config/api';
+
 let _ownedBadges: number[] = [];
 let balance = 0;
 
@@ -48,4 +51,20 @@ export function addOwnedBadge(id: number): void {
 export function resetWalletState(): void {
   balance = 0;
   _ownedBadges = [];
+}
+
+// Sincroniza saldo a partir do dashboard (fonte de verdade no backend)
+export async function syncWalletFromDashboard(): Promise<number> {
+  try {
+    const dash: any = await apiRequest(API_ENDPOINTS.auth.dashboard, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      absolute: true
+    });
+    const novoSaldo = Number(dash?.saldo_moedas ?? dash?.wallet?.saldo ?? dash?.saldo ?? 0);
+    setBalance(novoSaldo);
+    return novoSaldo;
+  } catch {
+    return getBalance();
+  }
 }

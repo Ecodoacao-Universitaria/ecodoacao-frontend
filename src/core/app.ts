@@ -6,7 +6,7 @@ import { initGaleria } from '../pages/galeria';
 import { injectNavbar, setNavbarUser } from '../utils/navbar';
 import { initNotifications, showToast, displayErrorToast } from '../utils/notifications';
 import { confirmAction, confirmWithInput } from '../utils/modals';
-import { getBalance, setBalance, updateBalanceUI } from '../services/wallet';
+import { getBalance, setBalance, updateBalanceUI, syncWalletFromDashboard } from '../services/wallet';
 import { isAdmin } from '../utils/permissions'; 
 import { renderHistorico } from '../pages/historico';
 import { escapeHtml } from '../utils/html';
@@ -31,6 +31,7 @@ import {
 } from '../services/badge.services';
 import { populateDonationTypesSelects } from '../services/donationType';
 import type { Doacao, Badge, UsuarioBadge } from '../types/api.types';
+import { toAbsoluteUrl } from '../config/api';
 
 // ===== INICIALIZAÇÃO =====
 if (document.readyState === 'loading') {
@@ -83,7 +84,7 @@ async function initApp(): Promise<void> {
   initNotifications();
   
   // Sincronizar saldo
-  syncBalance();
+  await syncBalance();
   
   // Hidratar nome do usuário na navbar
   await hydrateNavbarUser();
@@ -787,6 +788,9 @@ function renderAdminPanel(container: HTMLElement, doacoes: Doacao[]): void {
         <td>${escapeHtml(doacao.tipo_doacao)}</td>
         <td class="small">${formatarDataDoacao(doacao.data_submissao)}</td>
         <td>
+          <button class="btn btn-sm btn-outline-secondary me-2 detalhes-btn" data-id="${doacao.id}">
+            Detalhes
+          </button>
           <button class="btn btn-sm btn-success me-1 aprovar-btn" data-id="${doacao.id}">
             Aprovar
           </button>
@@ -796,6 +800,10 @@ function renderAdminPanel(container: HTMLElement, doacoes: Doacao[]): void {
         </td>
       `;
       tbody.appendChild(tr);
+
+      // bind detalhes com closure do objeto completo
+      const detBtn = tr.querySelector('.detalhes-btn') as HTMLButtonElement | null;
+      detBtn?.addEventListener('click', () => openPendenteDetalhes(doacao));
     });
 
     // Event listeners
@@ -815,6 +823,37 @@ function renderAdminPanel(container: HTMLElement, doacoes: Doacao[]): void {
   }
 
   container.appendChild(card);
+}
+
+function openPendenteDetalhes(doacao: Doacao): void {
+  const modal = document.getElementById('pendenteDetalhesModal');
+  const body = document.getElementById('pendenteDetalhesBody');
+  if (!modal || !body) return;
+
+  const fotoUrl = doacao.evidencia_foto ? toAbsoluteUrl(String(doacao.evidencia_foto)) : '';
+  const tipoNome = typeof doacao.tipo_doacao === 'string' ? doacao.tipo_doacao : (doacao as any)?.tipo_doacao?.nome || '—';
+  const conteudo = `
+    <div class="row g-3">
+      <div class="col-md-6">
+        <p><strong>ID:</strong> ${doacao.id}</p>
+        <p><strong>Doador:</strong> ${escapeHtml(doacao.doador || '')}</p>
+        <p><strong>Tipo:</strong> ${escapeHtml(String(tipoNome))}</p>
+        <p><strong>Data:</strong> ${formatarDataDoacao(doacao.data_submissao)}</p>
+        ${(doacao as any).descricao ? `<p class="mb-0"><strong>Descrição:</strong><br>${escapeHtml((doacao as any).descricao)}</p>` : ''}
+        ${doacao.motivo_recusa ? `<div class="alert alert-danger mt-3 mb-0"><strong>Motivo:</strong><br>${escapeHtml(String(doacao.motivo_recusa))}</div>` : ''}
+      </div>
+      <div class="col-md-6">
+        <div class="border rounded p-2 bg-light text-center">
+          ${fotoUrl
+            ? `<img src="${escapeHtml(fotoUrl)}" alt="Evidência" class="img-fluid" style="max-height:360px;object-fit:contain;">`
+            : '<span class="text-muted">Sem imagem</span>'}
+        </div>
+      </div>
+    </div>
+  `;
+  body.innerHTML = conteudo;
+  const bsModal = new (window as any).bootstrap.Modal(modal);
+  bsModal.show();
 }
 
 async function handleValidarDoacao(id: number, status: 'APROVADA' | 'RECUSADA'): Promise<void> {
@@ -854,8 +893,15 @@ async function handleValidarDoacao(id: number, status: 'APROVADA' | 'RECUSADA'):
   try {
     const resultado = await validarDoacao(id, { status, motivo_recusa });
     showToast(resultado.mensagem, status === 'APROVADA' ? 'success' : 'warning');
-    if (status === 'APROVADA' && 'saldo_restante' in resultado && typeof (resultado as any).saldo_restante === 'number') {
-      setBalance((resultado as any).saldo_restante);
+    if (status === 'APROVADA') {
+      const anyRes: any = resultado as any;
+      if (typeof anyRes.saldo_restante === 'number') {
+        setBalance(anyRes.saldo_restante);
+      } else if (typeof anyRes.saldo_atual === 'number') {
+        setBalance(anyRes.saldo_atual);
+      } else {
+        await syncWalletFromDashboard();
+      }
     }
     if (resultado.badges_conquistadas?.length) {
       showToast(`Badges: ${resultado.badges_conquistadas.join(', ')}`, 'success', 5000);
@@ -870,8 +916,14 @@ async function handleValidarDoacao(id: number, status: 'APROVADA' | 'RECUSADA'):
 // UTILIDADES
 // ============================================================================
 
-function syncBalance(): void {
-  updateBalanceUI(getBalance());
+async function syncBalance(): Promise<void> {
+  try {
+    if (isAuthenticated()) {
+      await syncWalletFromDashboard();
+    }
+  } finally {
+    updateBalanceUI(getBalance());
+  }
 }
 
 function renderBadgeIcone(badge: any): string {

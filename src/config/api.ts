@@ -65,3 +65,16 @@ export const multipartHeaders = (): Record<string,string> => {
   if (t) h['Authorization'] = `Bearer ${t}`;
   return h;
 };
+
+// Origin base (sem o sufixo /api), útil para transformar URLs relativas (/media/...) em absolutas
+export const API_ORIGIN = BASE || '';
+
+export function toAbsoluteUrl(url: string): string {
+  const u = String(url || '').trim();
+  if (!u) return '';
+  if (/^https?:\/\//i.test(u)) return u;
+  // Se começar com '/', prefixa a origem configurada
+  if (u.startsWith('/')) return `${API_ORIGIN}${u}`;
+  // Caso seja relativo sem '/', tenta combinar com origem
+  return `${API_ORIGIN}/${u}`.replace(/\/+$/, '');
+}

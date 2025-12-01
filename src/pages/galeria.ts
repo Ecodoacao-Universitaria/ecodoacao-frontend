@@ -4,7 +4,8 @@ import {
   atualizarBadgeAdmin,
   excluirBadgeAdmin
 } from '../services/badge.services';
-import { setBalance } from '../services/wallet';
+import { setBalance, syncWalletFromDashboard } from '../services/wallet';
+import { toAbsoluteUrl } from '../config/api';
 import { isAdmin } from '../utils/permissions';
 import { escapeHtml } from '../utils/html';
 import { showToast } from '../utils/notifications';
@@ -55,7 +56,8 @@ function renderDisponiveis(): void {
     card.className = 'text-center badge-card';
     card.dataset.badgeId = String(badge.id);
 
-    const iconUrl = badge.icone_url || '';
+    const rawIconUrl = badge.icone_url || '';
+    const iconUrl = rawIconUrl ? `${toAbsoluteUrl(String(rawIconUrl))}?v=${Date.now()}` : '';
     const iconHtml = iconUrl
       ? `<img src="${escapeHtml(iconUrl)}" alt="${escapeHtml(badge.nome)}" class="img-fluid rounded border" style="max-height:96px;max-width:96px;object-fit:cover;">`
       : `<div class="badge-icon mb-2" style="font-size:64px;">💎</div>`;
@@ -96,6 +98,10 @@ function initBuyButtons(): void {
           showToast(resp?.mensagem || 'Badge comprada!', 'success');
           if (typeof resp?.saldo_restante === 'number') {
             setBalance(resp.saldo_restante);
+          } else if (typeof resp?.saldo_atual === 'number') {
+            setBalance(resp.saldo_atual);
+          } else {
+            await syncWalletFromDashboard();
           }
           await loadDisponiveis();
           renderDisponiveis();
@@ -207,7 +213,7 @@ function openEditBadgeModal(badge: any): void {
   
   if (imgPreview) {
     if (badge.icone_url) {
-      imgPreview.src = badge.icone_url;
+      imgPreview.src = toAbsoluteUrl(String(badge.icone_url));
       imgPreview.style.display = 'block';
     } else {
       imgPreview.style.display = 'none';
@@ -313,15 +319,18 @@ async function submitEditBadge(): Promise<void> {
     isProcessingEdit = true;
     if (editBtn) editBtn.disabled = true;
 
-    await atualizarBadgeAdmin(editingBadgeId, {
+    const payload: any = {
       nome,
       descricao,
       tipo,
+      custo_moedas: tipo === 'COMPRA' ? custo_moedas : null,
       criterio_doacoes,
       criterio_moedas,
-      ativo: true,
-      icone: iconeFile || null
-    });
+      ativo: true
+    };
+    if (iconeFile) payload.icone = iconeFile;
+
+    await atualizarBadgeAdmin(editingBadgeId, payload);
 
     (window as any).bootstrap?.Modal.getOrCreateInstance(
       document.getElementById('editBadgeModal')!
