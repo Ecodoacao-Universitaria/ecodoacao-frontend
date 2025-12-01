@@ -162,7 +162,7 @@ function abrirDetalhesDoacao(doacao: HistoricoItem): void {
       <div class="col-md-6">
         <h6>Evidência</h6>
         ${doacao.evidencia_foto 
-          ? `<img src="${doacao.evidencia_foto}" alt="Evidência da doação" class="img-fluid rounded border" style="max-height:400px;width:100%;object-fit:contain;">`
+          ? `<img src="${escapeHtml(doacao.evidencia_foto)}" alt="Evidência da doação" class="img-fluid rounded border" style="max-height:400px;width:100%;object-fit:contain;">`
           : '<p class="text-muted">Sem imagem disponível</p>'
         }
       </div>

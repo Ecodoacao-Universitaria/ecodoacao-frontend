@@ -7,7 +7,6 @@ import {
 import { setBalance } from '../services/wallet';
 import { isAdmin } from '../utils/permissions';
 import { escapeHtml } from '../utils/html';
-import { API_BASE_URL } from '../config/api';
 import { showToast } from '../utils/notifications';
 
 let disponiveisCache: any[] = [];
@@ -16,15 +15,6 @@ let editingOriginal: any | null = null;
 let isProcessingEdit = false;
 let isProcessingDelete = false;
 
-function resolveMediaUrl(src: string | null | undefined): string {
-  if (!src) return '';
-  
-  if (typeof src === 'string' && (src.startsWith('http://') || src.startsWith('https://'))) {
-    return src;
-  }
-  
-  return '';
-}
 export async function initGaleria(): Promise<void> {
   await loadDisponiveis();
   renderDisponiveis();

@@ -13,10 +13,13 @@ export function setBalance(v: number): void {
 
 export function updateBalanceUI(v?: number): void {
   const val = typeof v === 'number' ? v : balance;
-  const el = document.querySelector('[data-balance]') as HTMLElement | null;
-  const el2 = document.getElementById('userBalance');
-  if (el) el.textContent = String(val);
-  if (el2) el2.textContent = String(val);
+  document.querySelectorAll('[data-balance]').forEach(el => {
+    el.textContent = String(val);
+  });
+  const userBalance = document.getElementById('userBalance');
+  if (userBalance) {
+    userBalance.innerHTML = `<span data-balance>${val}</span> Moedas`;
+  }
 }
 
 export function hydrateBalanceFromDashboard(v: number): void {
