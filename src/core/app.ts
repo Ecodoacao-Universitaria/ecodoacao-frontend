@@ -6,7 +6,7 @@ import { initGaleria } from '../pages/galeria';
 import { injectNavbar, setNavbarUser } from '../utils/navbar';
 import { initNotifications, showToast, displayErrorToast } from '../utils/notifications';
 import { confirmAction, confirmWithInput } from '../utils/modals';
-import { getBalance, setBalance } from '../services/wallet';
+import { getBalance, setBalance, updateBalanceUI } from '../services/wallet';
 import { isAdmin } from '../utils/permissions'; 
 import { renderHistorico } from '../pages/historico';
 import { escapeHtml } from '../utils/html';
@@ -30,7 +30,6 @@ import {
   criarBadgeAdmin 
 } from '../services/badge.services';
 import { populateDonationTypesSelects } from '../services/donationType';
-import { parseError } from '../services/errorHandling';
 import type { Doacao, Badge, UsuarioBadge } from '../types/api.types';
 
 // ===== INICIALIZAÇÃO =====
@@ -88,20 +87,12 @@ async function initApp(): Promise<void> {
   
   // Hidratar nome do usuário na navbar
   await hydrateNavbarUser();
-
-  // Listeners globais
-  //setupGlobalListeners();
   
   // Links com data-href
   setupDataHrefLinks();
   
   // Setup específico da página
   await setupPageSpecific();
-}
-
-// ===== LISTENERS GLOBAIS =====
-function setupGlobalListeners(): void {
-  // Outros listeners globais futuros podem vir aqui(seja lá quais)
 }
 
 async function hydrateNavbarUser(): Promise<void> {
@@ -881,16 +872,6 @@ async function handleValidarDoacao(id: number, status: 'APROVADA' | 'RECUSADA'):
 
 function syncBalance(): void {
   updateBalanceUI(getBalance());
-}
-
-function updateBalanceUI(balance: number): void {
-  document.querySelectorAll('[data-balance]').forEach(el => {
-    el.textContent = String(balance);
-  });
-  const userBalance = document.getElementById('userBalance');
-  if (userBalance) {
-    userBalance.innerHTML = `<span data-balance>${balance}</span> Moedas`;
-  }
 }
 
 function renderBadgeIcone(badge: any): string {

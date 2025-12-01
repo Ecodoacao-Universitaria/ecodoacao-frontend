@@ -1,3 +1,5 @@
+import { escapeHtml } from '../utils/html';
+
 export type ConfirmOptions = {
   title: string;
   message: string;
@@ -175,8 +177,3 @@ export function confirmWithInput(opts: ConfirmInputOptions): Promise<string | nu
   });
 }
 
-function escapeHtml(t: string): string {
-  const d = document.createElement('div');
-  d.textContent = t ?? '';
-  return d.innerHTML;
-}

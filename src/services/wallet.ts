@@ -13,10 +13,20 @@ export function setBalance(v: number): void {
 
 export function updateBalanceUI(v?: number): void {
   const val = typeof v === 'number' ? v : balance;
-  const el = document.querySelector('[data-balance]') as HTMLElement | null;
-  const el2 = document.getElementById('userBalance');
-  if (el) el.textContent = String(val);
-  if (el2) el2.textContent = String(val);
+  const safeVal = Number(val) || 0;
+  document.querySelectorAll('[data-balance]').forEach(el => {
+    el.textContent = String(safeVal);
+  });
+  const userBalance = document.getElementById('userBalance');
+  if (userBalance) {
+    // Check if we need to rebuild the structure
+    const existingSpan = userBalance.querySelector('[data-balance]') as HTMLElement | null;
+    if (existingSpan) {
+      existingSpan.textContent = String(safeVal);
+    } else {
+      userBalance.textContent = `${safeVal} Moedas`;
+    }
+  }
 }
 
 export function hydrateBalanceFromDashboard(v: number): void {
