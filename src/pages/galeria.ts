@@ -106,8 +106,8 @@ function initBuyButtons(): void {
           await loadDisponiveis();
           renderDisponiveis();
         } else {
-          // Se o backend retornar sucesso=false, mostra a mensagem de erro
-          showToast(resp?.mensagem || 'Falha na compra.', 'warning');
+          // Se o backend retornar sucesso=false, mostra a mensagem de erro do backend
+          showToast(resp?.mensagem || resp?.message || resp?.detail || 'Falha na compra.', 'warning');
         }
       } catch (err: any) {
         displayErrorToast(err);

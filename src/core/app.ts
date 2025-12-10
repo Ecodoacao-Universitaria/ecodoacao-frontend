@@ -416,7 +416,7 @@ async function setupSubmissaoPage(): Promise<void> {
     if (tipoSelect) tipoSelect.disabled = false;
   } catch (err) {
     console.error('Falha ao carregar tipos de doação:', err);
-    displayErrorToast(err, 'Erro ao carregar tipos de doação.');
+    displayErrorToast(err);
     if (tipoSelect) {
       tipoSelect.innerHTML = '<option value="">Erro ao carregar</option>';
       tipoSelect.disabled = true;
