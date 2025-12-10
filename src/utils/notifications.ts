@@ -117,6 +117,9 @@ function formatErrorMessage(msg: string, codigo?: string, detalhes?: any): strin
         fieldErrors.push(`• ${fieldName}: ${messages}`);
       } else if (typeof fieldValue === 'string' && fieldValue) {
         fieldErrors.push(`• ${fieldName}: ${fieldValue}`);
+      } else if (fieldValue != null && fieldValue !== '') {
+        // Fallback: converter outros tipos para string
+        fieldErrors.push(`• ${fieldName}: ${String(fieldValue)}`);
       }
     }
     if (fieldErrors.length > 0) {
