@@ -90,8 +90,12 @@ export function showApiError(error: any, fallback = 'Erro na requisição'): voi
 
   // Se temos detalhes, não incluí-los na mensagem principal
   // O formatErrorMessage vai formatar eles separadamente
-  const variant: ToastVariant = mapErrorCodeToVariant(codigo, mensagem);
-  showToast(formatErrorMessage(mensagem, codigo, detalhes), variant, 4500, { dedupeKey: codigo || mensagem });
+  // Se a mensagem é genérica e existem detalhes, suavizar o cabeçalho
+  const isGenericMsg = /^\s*(Erro na requisição|Error|Falha|Bad Request)\s*$/i.test(mensagem || '');
+  const headerMsg = (isGenericMsg && detalhes) ? 'Validação de formulário' : mensagem;
+
+  const variant: ToastVariant = mapErrorCodeToVariant(codigo, headerMsg);
+  showToast(formatErrorMessage(headerMsg, undefined, detalhes), variant, 4500, { dedupeKey: codigo || headerMsg });
 }
 
 export function showApiSuccess(payload: any, fallback = 'Operação concluída'): void {
@@ -127,10 +131,7 @@ function formatErrorMessage(msg: string, codigo?: string, detalhes?: any): strin
     }
   }
   
-  // Adicionar código se presente
-  if (codigo) {
-    parts.push(`\n(Código: ${codigo})`);
-  }
+  // Não exibir código para evitar poluir UI
   
   return parts.join('');
 }
@@ -188,9 +189,14 @@ export function showServiceResult(result: any): void {
 
 export function displayErrorToast(err: any, fallback = 'Erro'): void {
   if (!err) { showToast(fallback, 'danger'); return; }
-  // Prioriza mensagem da API (err.message já contém detail/erro extraído pelo http.ts)
-  const msg = err.message || err?.payload?.mensagem || err?.payload?.detail || err?.payload?.erro || fallback;
-  showToast(msg, err.status && err.status >= 500 ? 'danger' : 'warning', 6000);
+  // Delegar para showApiError para incluir detalhes de campos da API
+  // Isso garante exibição de {erro, codigo, detalhes}
+  try {
+    showApiError(err, fallback);
+  } catch {
+    const msg = err?.message || err?.payload?.mensagem || err?.payload?.detail || err?.payload?.erro || fallback;
+    showToast(String(msg), err?.status && err.status >= 500 ? 'danger' : 'warning', 6000);
+  }
 }
 
 // Disponibiliza global

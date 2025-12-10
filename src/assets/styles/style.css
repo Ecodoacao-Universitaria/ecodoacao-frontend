@@ -447,7 +447,7 @@ label {
 }
 @media (max-width: 480px) {
   .login-container {
-    width: 95%;
+    border: none;
     padding: 16px;
   }
   h1 { font-size: 20px; }
@@ -457,7 +457,7 @@ label {
   }
   .saldo-valor { font-size: 26px; }
   .badge img {
-    width: 60px;
+    white-space: pre-wrap;
     height: 60px;
   }
   .badge p { font-size: 13px; }
