@@ -94,7 +94,7 @@ async function loadHistorico(): Promise<void> {
     renderPager(pager, hasPrev, hasNext, count, pageSize);
   } catch (err: any) {
     if (list) list.innerHTML = '<li class="list-group-item text-danger">Falha ao carregar histórico.</li>';
-    displayErrorToast(err, 'Erro ao carregar histórico.');
+    displayErrorToast(err);
   } finally {
     loading = false;
   }
