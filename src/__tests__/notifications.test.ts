@@ -127,6 +127,37 @@ describe('notifications', () => {
       expect(toast?.textContent).toContain('Email já está em uso.');
       expect(toast?.textContent).toContain('ValidationError');
     });
+
+    it('formata múltiplos erros de validação corretamente', () => {
+      const error = {
+        response: {
+          data: {
+            erro: 'Erro na requisição',
+            codigo: 'ValidationError2',  // Different code to avoid deduplication
+            detalhes: {
+              username: ['Um usuário com este nome de usuário já existe.'],
+              email: ['Email já está em uso.']
+            }
+          }
+        }
+      };
+      showApiError(error);
+      
+      const toast = document.querySelector('.toast-body');
+      const text = toast?.textContent || '';
+      
+      // Verifica que a mensagem principal está presente
+      expect(text).toContain('Erro na requisição');
+      
+      // Verifica que os erros de campo estão presentes com bullets
+      expect(text).toContain('• username:');
+      expect(text).toContain('Um usuário com este nome de usuário já existe.');
+      expect(text).toContain('• email:');
+      expect(text).toContain('Email já está em uso.');
+      
+      // Verifica que o código está presente
+      expect(text).toContain('Código: ValidationError2');
+    });
   });
 
   describe('showApiSuccess', () => {
