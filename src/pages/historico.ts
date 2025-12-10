@@ -1,6 +1,6 @@
 import { historicoUsuario, getStatusInfo, formatarDataDoacao } from '../services/doacoes.services';
 import { escapeHtml } from '../utils/html';
-import { showToast } from '../utils/notifications';
+import { displayErrorToast } from '../utils/notifications';
 
 type HistoricoItem = {
   id: number;
@@ -94,9 +94,7 @@ async function loadHistorico(): Promise<void> {
     renderPager(pager, hasPrev, hasNext, count, pageSize);
   } catch (err: any) {
     if (list) list.innerHTML = '<li class="list-group-item text-danger">Falha ao carregar histórico.</li>';
-    const msg = err?.payload?.detail || err?.message || 'Erro ao carregar histórico.';
-    showToast(msg, 'danger');
-    console.error(err);
+    displayErrorToast(err, 'Erro ao carregar histórico.');
   } finally {
     loading = false;
   }

@@ -1,5 +1,6 @@
 import { isAuthenticated, logout, getUserClaims } from '../services/auth.services';
 import { isAdmin } from '../utils/permissions';
+import logoUrl from '../assets/img/logo-eco-doacao.png';
 
 function buildAuthLinks() {
   if (isAuthenticated()) {
@@ -37,7 +38,7 @@ export function injectNavbar() {
   nav.innerHTML = `
     <div class="container">
       <a class="navbar-brand d-flex align-items-center gap-2" href="/">
-        <img src="/src/assets/img/logo-eco-doacao.png" alt="Eco Doação" style="height:34px;" />
+        <img src="${logoUrl}" alt="Eco Doação" style="height:34px;" />
         <span class="fw-bold text-success">Eco Doação</span>
       </a>
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#ecodoacaoNavMenu">

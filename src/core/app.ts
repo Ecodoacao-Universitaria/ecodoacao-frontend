@@ -10,6 +10,7 @@ import { getBalance, setBalance, updateBalanceUI, syncWalletFromDashboard } from
 import { isAdmin } from '../utils/permissions'; 
 import { renderHistorico } from '../pages/historico';
 import { escapeHtml } from '../utils/html';
+import logoUrl from '../assets/img/logo-eco-doacao.png';
 
 // ===== IMPORTS DA API =====
 import { login, isAuthenticated, requireAuth, redirectIfAuthenticated } from '../services/auth.services';
@@ -82,6 +83,10 @@ async function initApp(): Promise<void> {
   // Componentes visuais
   injectNavbar();
   initNotifications();
+  // Corrige logos referenciadas diretamente em HTML para usar asset bundlado
+  document.querySelectorAll('img[src$="logo-eco-doacao.png"]').forEach((el) => {
+    (el as HTMLImageElement).src = logoUrl;
+  });
   
   // Sincronizar saldo
   await syncBalance();
@@ -162,8 +167,8 @@ function setupLoginPage(): void {
       showToast('Login realizado.', 'success');
       setTimeout(() => location.href = '/src/pages/dashboard.html', 500);
     } catch (err: any) {
-      const msg = err?.response?.data?.detail || 'Falha no login.';
-      showToast(msg, 'danger', 5000);
+      // Usa utilitário que extrai `detail/erro` da resposta da API
+      displayErrorToast(err, 'Falha no login.');
     }
   });
 }
@@ -189,14 +194,8 @@ function setupCadastroPage(): void {
       showToast('Autenticado.', 'success');
       setTimeout(() => location.href = '/src/pages/dashboard.html', 600);
     } catch (err: any) {
-      const data = err?.response?.data;
-      const userErr = Array.isArray(data?.username) ? data.username.join(', ') : '';
-      const msg = userErr
-        ? 'Username já existe. Faça login.'
-        : data?.detail
-          || Object.keys(data || {}).map(k => `${k}: ${Array.isArray(data[k]) ? data[k].join(', ') : data[k]}`).join(' | ')
-          || 'Falha no cadastro.';
-      showToast(msg, 'danger', 6000);
+      // Exibe mensagem real da API
+      displayErrorToast(err, 'Falha no cadastro.');
       //if (userErr) setTimeout(() => location.href = '/src/pages/login.html', 1000);
     }
   });
@@ -223,8 +222,7 @@ async function setupDashboardPage(): Promise<void> {
     renderDashboardStats(container, dashboard, minhasBadges.length);
     renderDashboardBadges(container, minhasBadges);
   } catch (error) {
-    showToast('Erro ao carregar dashboard', 'danger');
-    console.error(error);
+    displayErrorToast(error, 'Erro ao carregar dashboard.');
   }
 }
 
@@ -370,11 +368,7 @@ async function setupPerfilPage(): Promise<void> {
         originalEmail = user.email.toLowerCase();
         updateSubmitState();
       } catch (err: any) {
-        const data = err?.response?.data || {};
-        const msg = data?.detail
-          || Object.keys(data).map(k => `${k}: ${Array.isArray(data[k]) ? data[k].join(', ') : data[k]}`).join(' | ')
-          || 'Erro ao atualizar.';
-        showToast(msg, 'danger', 6000);
+        displayErrorToast(err, 'Erro ao atualizar.');
       }
     });
   }
@@ -397,11 +391,7 @@ async function setupPerfilPage(): Promise<void> {
           if (el) el.value = '';
         });
       } catch (err: any) {
-        const data = err?.response?.data || {};
-        const msg = data?.detail
-          || Object.keys(data).map(k => `${k}: ${Array.isArray(data[k]) ? data[k].join(', ') : data[k]}`).join(' | ')
-          || 'Erro ao alterar senha.';
-        showToast(msg, 'danger', 6000);
+        displayErrorToast(err, 'Erro ao alterar senha.');
       }
     });
   }
@@ -535,8 +525,7 @@ async function setupBadgesPage(): Promise<void> {
     renderMinhasBadges(container, minhas);
     renderBadgesDisponiveis(container, disponiveis);
   } catch (error) {
-    showToast('Erro ao carregar badges', 'danger');
-    console.error(error);
+    displayErrorToast(error, 'Erro ao carregar badges.');
   }
 }
 
@@ -722,11 +711,7 @@ function initCreateBadgeHandlers(): void {
       )?.hide();
       setTimeout(() => location.reload(), 600);
     } catch (err: any) {
-      const data = err?.response?.data || {};
-      const msg = data?.detail
-        || Object.keys(data).map(k => `${k}: ${Array.isArray(data[k]) ? data[k].join(', ') : data[k]}`).join(' | ')
-        || 'Erro ao criar badge.';
-      showToast(msg, 'danger', 6000);
+      displayErrorToast(err, 'Erro ao criar badge.');
     }
   });
 }

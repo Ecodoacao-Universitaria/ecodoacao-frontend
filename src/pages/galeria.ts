@@ -8,7 +8,7 @@ import { setBalance, syncWalletFromDashboard } from '../services/wallet';
 import { toAbsoluteUrl } from '../config/api';
 import { isAdmin } from '../utils/permissions';
 import { escapeHtml } from '../utils/html';
-import { showToast } from '../utils/notifications';
+import { showToast, displayErrorToast } from '../utils/notifications';
 
 let disponiveisCache: any[] = [];
 let editingBadgeId: number | null = null;
@@ -35,7 +35,7 @@ async function loadDisponiveis(): Promise<void> {
   } catch (e) {
     disponiveisCache = [];
     if (grid) grid.innerHTML = '<div class="text-danger">Erro ao carregar badges.</div>';
-    console.error(e);
+    displayErrorToast(e, 'Erro ao carregar badges.');
   }
 }
 
@@ -109,9 +109,7 @@ function initBuyButtons(): void {
           showToast(resp?.mensagem || 'Falha na compra.', 'warning');
         }
       } catch (err: any) {
-        const msg = err?.payload?.detail || err?.message || 'Falha ao comprar badge.';
-        showToast(msg, 'danger');
-        console.error(err);
+        displayErrorToast(err, 'Falha ao comprar badge.');
       } finally {
         target.disabled = false;
         target.textContent = 'Comprar';
@@ -340,8 +338,7 @@ async function submitEditBadge(): Promise<void> {
     await loadDisponiveis();
     renderDisponiveis();
   } catch (err) {
-    console.error(err);
-    showToast('Erro ao atualizar', 'danger');
+    displayErrorToast(err, 'Erro ao atualizar badge.');
   } finally {
     isProcessingEdit = false;
     if (editBtn) editBtn.disabled = false;
@@ -367,8 +364,7 @@ async function submitDeleteBadge(): Promise<void> {
     await loadDisponiveis();
     renderDisponiveis();
   } catch (err) {
-    console.error(err);
-    showToast('Erro ao excluir', 'danger');
+    displayErrorToast(err, 'Erro ao excluir badge.');
   } finally {
     isProcessingDelete = false;
     if (delBtn) delBtn.disabled = false;
