@@ -240,6 +240,59 @@ describe('notifications', () => {
       const toast = document.querySelector('.toast');
       expect(toast?.innerHTML).toContain('bg-warning');
     });
+
+    it('formata erros de validação com detalhes do payload', () => {
+      const error = {
+        message: 'Erro de validação',
+        status: 400,
+        code: 'VALIDATION_ERROR',
+        payload: {
+          mensagem: 'Erro de validação',
+          codigo: 'VALIDATION_ERROR',
+          detalhes: {
+            username: ['Um usuário com este nome de usuário já existe.'],
+            email: ['Email já está em uso.']
+          }
+        }
+      };
+      displayErrorToast(error);
+      
+      const toast = document.querySelector('.toast-body');
+      const text = toast?.textContent || '';
+      
+      // Verifica que a mensagem principal está presente
+      expect(text).toContain('Erro de validação');
+      
+      // Verifica que os erros de campo estão presentes com bullets
+      expect(text).toContain('• username:');
+      expect(text).toContain('Um usuário com este nome de usuário já existe.');
+      expect(text).toContain('• email:');
+      expect(text).toContain('Email já está em uso.');
+      
+      // Verifica que o código está presente
+      expect(text).toContain('Código: VALIDATION_ERROR');
+    });
+
+    it('formata múltiplas mensagens de erro do mesmo campo', () => {
+      const error = {
+        message: 'Erro de validação',
+        status: 400,
+        payload: {
+          detalhes: {
+            password: ['Senha muito curta.', 'Senha deve conter números.', 'Senha deve conter letras.']
+          }
+        }
+      };
+      displayErrorToast(error);
+      
+      const toast = document.querySelector('.toast-body');
+      const text = toast?.textContent || '';
+      
+      expect(text).toContain('• password:');
+      expect(text).toContain('Senha muito curta.');
+      expect(text).toContain('Senha deve conter números.');
+      expect(text).toContain('Senha deve conter letras.');
+    });
   });
 
   describe('addNotification', () => {

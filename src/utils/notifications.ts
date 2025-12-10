@@ -190,7 +190,14 @@ export function displayErrorToast(err: any, fallback = 'Erro'): void {
   if (!err) { showToast(fallback, 'danger'); return; }
   // Prioriza mensagem da API (err.message já contém detail/erro extraído pelo http.ts)
   const msg = err.message || err?.payload?.mensagem || err?.payload?.detail || err?.payload?.erro || fallback;
-  showToast(msg, err.status && err.status >= 500 ? 'danger' : 'warning', 6000);
+  const codigo = err?.code || err?.payload?.codigo || '';
+  const detalhes = err?.payload?.detalhes;
+  
+  // Formata a mensagem com detalhes e código, similar a showApiError
+  const formattedMsg = formatErrorMessage(msg, codigo, detalhes);
+  const variant = err.status && err.status >= 500 ? 'danger' : 'warning';
+  
+  showToast(formattedMsg, variant, 6000);
 }
 
 // Disponibiliza global
