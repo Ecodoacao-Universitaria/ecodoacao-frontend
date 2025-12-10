@@ -329,13 +329,13 @@ async function submitEditBadge(): Promise<void> {
     };
     if (iconeFile) payload.icone = iconeFile;
 
-    await atualizarBadgeAdmin(editingBadgeId, payload);
+    const result = await atualizarBadgeAdmin(editingBadgeId, payload);
 
     (window as any).bootstrap?.Modal.getOrCreateInstance(
       document.getElementById('editBadgeModal')!
     )?.hide();
 
-    showApiSuccess(null, 'Badge atualizada');
+    showApiSuccess(result, 'Badge atualizada');
     await loadDisponiveis();
     renderDisponiveis();
   } catch (err) {
@@ -355,13 +355,13 @@ async function submitDeleteBadge(): Promise<void> {
     isProcessingDelete = true;
     if (delBtn) delBtn.disabled = true;
 
-    await excluirBadgeAdmin(editingBadgeId);
+    const result = await excluirBadgeAdmin(editingBadgeId);
 
     (window as any).bootstrap?.Modal.getOrCreateInstance(
       document.getElementById('editBadgeModal')!
     )?.hide();
 
-    showApiSuccess(null, 'Badge excluída');
+    showApiSuccess(result, 'Badge excluída');
     await loadDisponiveis();
     renderDisponiveis();
   } catch (err) {
