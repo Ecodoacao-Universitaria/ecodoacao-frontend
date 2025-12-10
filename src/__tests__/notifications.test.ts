@@ -103,6 +103,30 @@ describe('notifications', () => {
       expect(toast?.textContent).toContain('Falha');
       expect(toast?.textContent).toContain('ERR_001');
     });
+
+    it('concatena mensagens de detalhes quando presentes', () => {
+      const error = {
+        response: {
+          data: {
+            erro: 'Erro na requisição',
+            codigo: 'ValidationError',
+            detalhes: {
+              username: [
+                'Informe um nome de usuário válido. Este valor pode conter apenas letras, números e os seguintes caracteres @/./+/-/_.'
+              ],
+              email: [
+                'Email já está em uso.'
+              ]
+            }
+          }
+        }
+      };
+      showApiError(error);
+      const toast = document.querySelector('.toast-body');
+      expect(toast?.textContent).toContain('Informe um nome de usuário válido');
+      expect(toast?.textContent).toContain('Email já está em uso.');
+      expect(toast?.textContent).toContain('ValidationError');
+    });
   });
 
   describe('showApiSuccess', () => {

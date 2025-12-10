@@ -74,13 +74,25 @@ export function showToast(
 }
 
 export function showApiError(error: any, fallback = 'Erro na requisição'): void {
-  const data: ApiErrorShape | undefined = error?.response?.data;
+  const data: any = error?.response?.data || error?.payload;
   let mensagem = fallback;
-  let codigo = data?.codigo || '';
+  let codigo = data?.codigo || error?.code || '';
   let detalhes = data?.detalhes;
 
-  if (data?.erro) mensagem = String(data.erro);
-  else if (error?.message && !data) mensagem = error.message;
+  // Priorizar mensagem do backend
+  if (data?.mensagem) mensagem = String(data.mensagem);
+  else if (detalhes && typeof detalhes === 'object') {
+    // Extrai mensagens dos campos detalhados (ex.: username, email)
+    const msgs: string[] = [];
+    for (const [k, v] of Object.entries(detalhes)) {
+      if (Array.isArray(v) && v.length) msgs.push(String(v[0]));
+      else if (typeof v === 'string' && v) msgs.push(v);
+    }
+    if (msgs.length) mensagem = msgs.join(' | ');
+    else if (data?.erro) mensagem = String(data.erro);
+    else if (error?.message) mensagem = String(error.message);
+  } else if (data?.erro) mensagem = String(data.erro);
+  else if (error?.message) mensagem = String(error.message);
 
   const variant: ToastVariant = mapErrorCodeToVariant(codigo, mensagem);
   showToast(formatErrorMessage(mensagem, codigo, detalhes), variant, 4500, { dedupeKey: codigo || mensagem });

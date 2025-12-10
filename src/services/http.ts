@@ -4,7 +4,10 @@ const API_BASE =
   'http://localhost:8000';
 
 const API_BASE_NORMALIZED = String(API_BASE).trim().replace(/\/+$/,'');
-const API_ROOT = `${API_BASE_NORMALIZED}/api`;
+// Evita duplicar `/api` quando a base já inclui o segmento
+const API_ROOT = API_BASE_NORMALIZED.replace(/\/?$/,'').endsWith('/api')
+  ? API_BASE_NORMALIZED
+  : `${API_BASE_NORMALIZED}/api`;
 
 const ACCESS_KEY = 'ecodoacao_access';
 const REFRESH_KEY = 'ecodoacao_refresh';
@@ -121,6 +124,7 @@ export async function apiRequest<TResp = any, TBody = any>(
       headers: finalHeaders,
       body: fetchBody,
       signal: ctrl.signal,
+      mode: 'cors',
       credentials
     });
   } catch (e: any) {
@@ -145,6 +149,7 @@ export async function apiRequest<TResp = any, TBody = any>(
             headers: finalHeaders,
             body: fetchBody,
             signal: ctrl.signal,
+            mode: 'cors',
             credentials
           });
           const retryTxt = await retryResp.text();
@@ -156,10 +161,11 @@ export async function apiRequest<TResp = any, TBody = any>(
           if (retryResp.status === 401) {
             clearTokens();
           }
-          const retryDetail = retryJson?.detail || retryJson?.erro || retryResp.statusText || 'Erro na requisição';
+          const retryDetail = retryJson?.mensagem || retryJson?.detail || retryJson?.erro || retryResp.statusText || 'Erro na requisição';
           const retryError: any = new Error(retryDetail);
           retryError.status = retryResp.status;
           retryError.payload = retryJson;
+          if (retryJson?.codigo) retryError.code = retryJson.codigo;
           throw retryError;
         } else {
           clearTokens();
@@ -168,10 +174,11 @@ export async function apiRequest<TResp = any, TBody = any>(
         clearTokens();
       }
     }
-    const detail = json?.detail || json?.erro || resp.statusText || 'Erro na requisição';
+    const detail = json?.mensagem || json?.detail || json?.erro || resp.statusText || 'Erro na requisição';
     const error: any = new Error(detail);
     error.status = resp.status;
     error.payload = json;
+    if (json?.codigo) error.code = json.codigo;
     throw error;
   }
   return json as TResp;
