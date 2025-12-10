@@ -8,7 +8,7 @@ import { setBalance, syncWalletFromDashboard } from '../services/wallet';
 import { toAbsoluteUrl } from '../config/api';
 import { isAdmin } from '../utils/permissions';
 import { escapeHtml } from '../utils/html';
-import { showToast, displayErrorToast } from '../utils/notifications';
+import { showToast, displayErrorToast, showApiSuccess } from '../utils/notifications';
 
 let disponiveisCache: any[] = [];
 let editingBadgeId: number | null = null;
@@ -35,7 +35,7 @@ async function loadDisponiveis(): Promise<void> {
   } catch (e) {
     disponiveisCache = [];
     if (grid) grid.innerHTML = '<div class="text-danger">Erro ao carregar badges.</div>';
-    displayErrorToast(e, 'Erro ao carregar badges.');
+    displayErrorToast(e);
   }
 }
 
@@ -95,7 +95,7 @@ function initBuyButtons(): void {
         const resp = await comprarBadge(badgeId);
         const ok = resp?.sucesso !== false;
         if (ok) {
-          showToast(resp?.mensagem || 'Badge comprada!', 'success');
+          showApiSuccess(resp, 'Badge comprada!');
           if (typeof resp?.saldo_restante === 'number') {
             setBalance(resp.saldo_restante);
           } else if (typeof resp?.saldo_atual === 'number') {
@@ -106,10 +106,11 @@ function initBuyButtons(): void {
           await loadDisponiveis();
           renderDisponiveis();
         } else {
-          showToast(resp?.mensagem || 'Falha na compra.', 'warning');
+          // Se o backend retornar sucesso=false, mostra a mensagem de erro do backend
+          showToast(resp?.mensagem || resp?.message || resp?.detail || 'Falha na compra.', 'warning');
         }
       } catch (err: any) {
-        displayErrorToast(err, 'Falha ao comprar badge.');
+        displayErrorToast(err);
       } finally {
         target.disabled = false;
         target.textContent = 'Comprar';
@@ -328,17 +329,17 @@ async function submitEditBadge(): Promise<void> {
     };
     if (iconeFile) payload.icone = iconeFile;
 
-    await atualizarBadgeAdmin(editingBadgeId, payload);
+    const result = await atualizarBadgeAdmin(editingBadgeId, payload);
 
     (window as any).bootstrap?.Modal.getOrCreateInstance(
       document.getElementById('editBadgeModal')!
     )?.hide();
 
-    showToast('Badge atualizada', 'success');
+    showApiSuccess(result, 'Badge atualizada');
     await loadDisponiveis();
     renderDisponiveis();
   } catch (err) {
-    displayErrorToast(err, 'Erro ao atualizar badge.');
+    displayErrorToast(err);
   } finally {
     isProcessingEdit = false;
     if (editBtn) editBtn.disabled = false;
@@ -354,17 +355,17 @@ async function submitDeleteBadge(): Promise<void> {
     isProcessingDelete = true;
     if (delBtn) delBtn.disabled = true;
 
-    await excluirBadgeAdmin(editingBadgeId);
+    const result = await excluirBadgeAdmin(editingBadgeId);
 
     (window as any).bootstrap?.Modal.getOrCreateInstance(
       document.getElementById('editBadgeModal')!
     )?.hide();
 
-    showToast('Badge excluída', 'success');
+    showApiSuccess(result, 'Badge excluída');
     await loadDisponiveis();
     renderDisponiveis();
   } catch (err) {
-    displayErrorToast(err, 'Erro ao excluir badge.');
+    displayErrorToast(err);
   } finally {
     isProcessingDelete = false;
     if (delBtn) delBtn.disabled = false;

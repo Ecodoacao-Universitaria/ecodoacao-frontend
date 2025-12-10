@@ -4,7 +4,7 @@
  */
 import { initGaleria } from '../pages/galeria';
 import { injectNavbar, setNavbarUser } from '../utils/navbar';
-import { initNotifications, showToast, displayErrorToast } from '../utils/notifications';
+import { initNotifications, showToast, displayErrorToast, showApiSuccess } from '../utils/notifications';
 import { confirmAction, confirmWithInput } from '../utils/modals';
 import { getBalance, setBalance, updateBalanceUI, syncWalletFromDashboard } from '../services/wallet';
 import { isAdmin } from '../utils/permissions'; 
@@ -163,12 +163,13 @@ function setupLoginPage(): void {
     const senha = (document.getElementById('senha') as HTMLInputElement)?.value || '';
     if (!username) { showToast('Informe seu username.', 'warning'); return; }
     try {
-      await login({ username, password: senha });
-      showToast('Login realizado.', 'success');
+      const response = await login({ username, password: senha });
+      // Exibe mensagem do backend se disponível, senão usa padrão
+      showApiSuccess(response, 'Login realizado.');
       setTimeout(() => location.href = '/src/pages/dashboard.html', 500);
     } catch (err: any) {
-      // Usa utilitário que extrai `detail/erro` da resposta da API
-      displayErrorToast(err, 'Falha no login.');
+      // Exibe mensagem de erro do backend
+      displayErrorToast(err);
     }
   });
 }
@@ -188,14 +189,14 @@ function setupCadastroPage(): void {
     if (senha.length < 6) { showToast('Senha mínima 6 caracteres.', 'warning'); return; }
     try {
       const novo = await registrarUsuario({ username, email, password: senha });
-      showToast('Conta criada.', 'success');
+      showApiSuccess(novo, 'Conta criada.');
       // Login direto
-      await login({ username: novo.username, password: senha });
-      showToast('Autenticado.', 'success');
+      const loginResp = await login({ username: novo.username, password: senha });
+      showApiSuccess(loginResp, 'Autenticado.');
       setTimeout(() => location.href = '/src/pages/dashboard.html', 600);
     } catch (err: any) {
       // Exibe mensagem real da API
-      displayErrorToast(err, 'Falha no cadastro.');
+      displayErrorToast(err);
       //if (userErr) setTimeout(() => location.href = '/src/pages/login.html', 1000);
     }
   });
@@ -222,7 +223,7 @@ async function setupDashboardPage(): Promise<void> {
     renderDashboardStats(container, dashboard, minhasBadges.length);
     renderDashboardBadges(container, minhasBadges);
   } catch (error) {
-    displayErrorToast(error, 'Erro ao carregar dashboard.');
+    displayErrorToast(error);
   }
 }
 
@@ -358,7 +359,7 @@ async function setupPerfilPage(): Promise<void> {
       if (!email.endsWith('@ufrpe.br')) { showToast('E-mail deve terminar com @ufrpe.br', 'warning'); return; }
       try {
         const user = await atualizarPerfil({ username, email });
-        showToast('Perfil atualizado.', 'success');
+        showApiSuccess(user, 'Perfil atualizado.');
         if (displayUsername) displayUsername.textContent = user.username;
         if (displayEmail) displayEmail.textContent = user.email.toLowerCase();
         setNavbarUser(user.username);
@@ -368,7 +369,7 @@ async function setupPerfilPage(): Promise<void> {
         originalEmail = user.email.toLowerCase();
         updateSubmitState();
       } catch (err: any) {
-        displayErrorToast(err, 'Erro ao atualizar.');
+        displayErrorToast(err);
       }
     });
   }
@@ -385,13 +386,13 @@ async function setupPerfilPage(): Promise<void> {
       }
       try {
         const resp = await alterarSenha({ senha_atual: atual, nova_senha: nova });
-        showToast(resp.detail || 'Senha alterada.', 'success');
+        showApiSuccess(resp, 'Senha alterada.');
         ['senhaAtual','novaSenha','confirmarNovaSenha'].forEach(id => {
           const el = document.getElementById(id) as HTMLInputElement | null;
           if (el) el.value = '';
         });
       } catch (err: any) {
-        displayErrorToast(err, 'Erro ao alterar senha.');
+        displayErrorToast(err);
       }
     });
   }
@@ -415,7 +416,7 @@ async function setupSubmissaoPage(): Promise<void> {
     if (tipoSelect) tipoSelect.disabled = false;
   } catch (err) {
     console.error('Falha ao carregar tipos de doação:', err);
-    showToast('Erro ao carregar tipos de doação.', 'warning');
+    displayErrorToast(err);
     if (tipoSelect) {
       tipoSelect.innerHTML = '<option value="">Erro ao carregar</option>';
       tipoSelect.disabled = true;
@@ -468,15 +469,15 @@ async function setupSubmissaoPage(): Promise<void> {
     }
 
     try {
-      await criarDoacao({
+      const result = await criarDoacao({
         tipo_doacao: tipoId,
         descricao: descInput?.value?.trim() || '',
         evidencia_foto: file,
       });
-      showToast('Doação enviada para validação!', 'success');
+      showApiSuccess(result, 'Doação enviada para validação!');
       setTimeout(() => location.href = 'historico.html', 700);
     } catch (error) {
-      displayErrorToast(error, 'Erro ao enviar doação.');
+      displayErrorToast(error);
     }
   });
 }
@@ -503,7 +504,7 @@ async function setupHistoricoPage(): Promise<void> {
     renderHistorico(list, historicoItems);
   } catch (error) {
     list.innerHTML = '<li class="list-group-item text-danger">Erro ao carregar histórico.</li>';
-    displayErrorToast(error, 'Erro ao carregar histórico.');
+    displayErrorToast(error);
   }
 }
 
@@ -525,7 +526,7 @@ async function setupBadgesPage(): Promise<void> {
     renderMinhasBadges(container, minhas);
     renderBadgesDisponiveis(container, disponiveis);
   } catch (error) {
-    displayErrorToast(error, 'Erro ao carregar badges.');
+    displayErrorToast(error);
   }
 }
 
@@ -705,13 +706,13 @@ function initCreateBadgeHandlers(): void {
         ativo: true,
         icone: iconeFile || null,
       });
-      showToast(`Badge criada: ${created.nome}`, 'success');
+      showApiSuccess(created, `Badge criada: ${created.nome}`);
       (window as any).bootstrap?.Modal.getOrCreateInstance(
         document.getElementById('createBadgeModal')!
       )?.hide();
       setTimeout(() => location.reload(), 600);
     } catch (err: any) {
-      displayErrorToast(err, 'Erro ao criar badge.');
+      displayErrorToast(err);
     }
   });
 }
@@ -731,7 +732,7 @@ async function setupAdminPage(): Promise<void> {
     renderAdminPanel(panel, response.results);
   } catch (error) {
     panel.innerHTML = '<div class="text-danger">Erro ao carregar doações pendentes.</div>';
-    displayErrorToast(error, 'Erro ao carregar doações pendentes.');
+    displayErrorToast(error);
   }
 }
 
@@ -893,7 +894,7 @@ async function handleValidarDoacao(id: number, status: 'APROVADA' | 'RECUSADA'):
     }
     await setupAdminPage();
   } catch (error) {
-    displayErrorToast(error, 'Erro ao carregar validação de doação.');
+    displayErrorToast(error);
   }
 }
 
