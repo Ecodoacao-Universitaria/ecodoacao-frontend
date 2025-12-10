@@ -91,7 +91,8 @@ export function showApiSuccess(payload: any, fallback = 'Operação concluída')
     showToast(fallback, 'success');
     return;
   }
-  const msg = payload.mensagem || payload.detail || fallback;
+  // Prioriza mensagem do backend
+  const msg = payload.mensagem || payload.message || payload.detail || fallback;
   showToast(String(msg), 'success');
 }
 
@@ -162,7 +163,8 @@ export function showServiceResult(result: any): void {
 
 export function displayErrorToast(err: any, fallback = 'Erro'): void {
   if (!err) { showToast(fallback, 'danger'); return; }
-  const msg = err.message || err?.payload?.detail || fallback;
+  // Prioriza mensagem da API (err.message já contém detail/erro extraído pelo http.ts)
+  const msg = err.message || err?.payload?.mensagem || err?.payload?.detail || err?.payload?.erro || fallback;
   showToast(msg, err.status && err.status >= 500 ? 'danger' : 'warning', 6000);
 }
 
