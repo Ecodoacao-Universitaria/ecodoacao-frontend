@@ -36,9 +36,10 @@ describe('Submissão de Doação', () => {
   });
 
   it('permite digitar descrição', () => {
-    const desc = cy.get('textarea');
-    if (desc) {
-      desc.type('Descrição da doação').should('have.value', 'Descrição da doação');
-    }
+    cy.get('textarea').then(($textarea) => {
+      if ($textarea.length) {
+        cy.wrap($textarea).type('Descrição da doação').should('have.value', 'Descrição da doação');
+      }
+    });
   });
 });
