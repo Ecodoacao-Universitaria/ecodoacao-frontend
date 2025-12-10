@@ -80,20 +80,16 @@ export function showApiError(error: any, fallback = 'Erro na requisição'): voi
   let detalhes = data?.detalhes;
 
   // Priorizar mensagem do backend
-  if (data?.mensagem) mensagem = String(data.mensagem);
-  else if (detalhes && typeof detalhes === 'object') {
-    // Extrai mensagens dos campos detalhados (ex.: username, email)
-    const msgs: string[] = [];
-    for (const [k, v] of Object.entries(detalhes)) {
-      if (Array.isArray(v) && v.length) msgs.push(String(v[0]));
-      else if (typeof v === 'string' && v) msgs.push(v);
-    }
-    if (msgs.length) mensagem = msgs.join(' | ');
-    else if (data?.erro) mensagem = String(data.erro);
-    else if (error?.message) mensagem = String(error.message);
-  } else if (data?.erro) mensagem = String(data.erro);
-  else if (error?.message) mensagem = String(error.message);
+  if (data?.mensagem) {
+    mensagem = String(data.mensagem);
+  } else if (data?.erro) {
+    mensagem = String(data.erro);
+  } else if (error?.message) {
+    mensagem = String(error.message);
+  }
 
+  // Se temos detalhes, não incluí-los na mensagem principal
+  // O formatErrorMessage vai formatar eles separadamente
   const variant: ToastVariant = mapErrorCodeToVariant(codigo, mensagem);
   showToast(formatErrorMessage(mensagem, codigo, detalhes), variant, 4500, { dedupeKey: codigo || mensagem });
 }
@@ -109,17 +105,34 @@ export function showApiSuccess(payload: any, fallback = 'Operação concluída')
 }
 
 function formatErrorMessage(msg: string, codigo?: string, detalhes?: any): string {
-  if (!codigo && !detalhes) return msg;
-  const extras: string[] = [];
-  if (codigo) extras.push(`Código: ${codigo}`);
+  const parts: string[] = [msg];
+  
+  // Se temos detalhes de campos, formatá-los de forma clara
   if (detalhes && typeof detalhes === 'object') {
-    const flat = Object.entries(detalhes)
-      .slice(0, 3)
-      .map(([k,v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
-      .join(' | ');
-    if (flat) extras.push(flat);
+    const fieldErrors: string[] = [];
+    for (const [fieldName, fieldValue] of Object.entries(detalhes)) {
+      if (Array.isArray(fieldValue) && fieldValue.length > 0) {
+        // Pega todas as mensagens do array, não apenas a primeira
+        const messages = fieldValue.map(v => String(v)).join(', ');
+        fieldErrors.push(`• ${fieldName}: ${messages}`);
+      } else if (typeof fieldValue === 'string' && fieldValue) {
+        fieldErrors.push(`• ${fieldName}: ${fieldValue}`);
+      } else if (fieldValue != null && fieldValue !== '') {
+        // Fallback: converter outros tipos para string
+        fieldErrors.push(`• ${fieldName}: ${String(fieldValue)}`);
+      }
+    }
+    if (fieldErrors.length > 0) {
+      parts.push('\n' + fieldErrors.join('\n'));
+    }
   }
-  return `${msg}${extras.length ? ' (' + extras.join(' / ') + ')' : ''}`;
+  
+  // Adicionar código se presente
+  if (codigo) {
+    parts.push(`\n(Código: ${codigo})`);
+  }
+  
+  return parts.join('');
 }
 
 function mapErrorCodeToVariant(codigo?: string, mensagem?: string): ToastVariant {

@@ -401,6 +401,11 @@ label {
   color: var(--eco-green-900);
 }
 
+/* ===== Toast / Notificações ===== */
+.toast-body {
+  white-space: pre-line;
+}
+
 /* ===== Acessórios ===== */
 /* Nome de arquivo selecionado com quebra apropriada */
 #fotoFilename {
